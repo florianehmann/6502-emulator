@@ -20,6 +20,7 @@ class AddressingMode(enum.Enum):
     ABSOLUTE_X = enum.auto()
     ABSOLUTE_Y = enum.auto()
     INDIRECT_X = enum.auto()
+    INDIRECT_Y = enum.auto()
 
 
 class CPU6502:
@@ -46,6 +47,7 @@ class CPU6502:
             0xa5: partial(self.lda, mode=AddressingMode.ZERO_PAGE),
             0xad: partial(self.lda, mode=AddressingMode.ABSOLUTE),
             0xa9: partial(self.lda, mode=AddressingMode.IMMEDIATE),
+            0xb1: partial(self.lda, mode=AddressingMode.INDIRECT_Y),
             0xb5: partial(self.lda, mode=AddressingMode.ZERO_PAGE_X),
             0xb9: partial(self.lda, mode=AddressingMode.ABSOLUTE_Y),
             0xbd: partial(self.lda, mode=AddressingMode.ABSOLUTE_X),
@@ -111,6 +113,16 @@ class CPU6502:
                 self.a = self.memory.read(addr_indirect)
                 self.pc += 1
                 self.cycles += 6
+            case AddressingMode.INDIRECT_Y:
+                addr_zp = self.memory.read(self.pc)
+                indirect_base_lo = self.memory.read(addr_zp)
+                indirect_base_hi = self.memory.read((addr_zp + 1) & 0xff)
+                indirect_base = (indirect_base_hi << 8) | indirect_base_lo
+                effective_address = (indirect_base + self.y) & 0xffff
+                page_boundary_crossed = (indirect_base & 0xff00) != (effective_address & 0xff00)
+                self.a = self.memory.read(effective_address)
+                self.pc += 1
+                self.cycles += 5 if not page_boundary_crossed else 6
             case _:
                 # this should not ever be reached when running because the
                 # opcode table should never contain an invalid call
