@@ -129,7 +129,7 @@ def test_lda_addressing(cpu: CPU6502, mode: AddressingMode, page_boundary_cross:
             cpu.y = index
             cpu.memory.write(1, ZERO_PAGE_POINTER_LOCATION)
             cpu.memory.write(ZERO_PAGE_POINTER_LOCATION, (INDIRECT_DATA_LOCATION & 0xff))
-            cpu.memory.write(ZERO_PAGE_POINTER_LOCATION + 1, (INDIRECT_DATA_LOCATION >> 8 & 0xff))
+            cpu.memory.write(ZERO_PAGE_POINTER_LOCATION + 1, ((INDIRECT_DATA_LOCATION >> 8) & 0xff))
             cpu.memory.write(INDIRECT_DATA_LOCATION + index, test_value[mode])
         case _:
             raise ValueError

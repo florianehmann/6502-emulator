@@ -4,6 +4,7 @@ import enum
 import logging
 from collections.abc import Callable
 from functools import partial
+from typing import ClassVar, Literal
 
 from emulator.memory import Memory
 
@@ -26,6 +27,14 @@ class AddressingMode(enum.Enum):
 class CPU6502:
     """A behavioral model of the MOS6502."""
 
+    STATUS_C = 0
+    STATUS_Z = 1
+    STATUS_I = 2
+    STATUS_D = 3
+    STATUS_B = 4
+    STATUS_V = 6
+    STATUS_N = 7
+
     def __init__(self, memory: Memory) -> None:
         """Initialize a CPU with memory."""
         # Registers
@@ -39,6 +48,12 @@ class CPU6502:
 
         self.memory = memory
         self.opcodes = self.build_opcode_table()
+
+        # initial values for the status register
+        self.status |= (1 << self.STATUS_Z)
+        self.status |= (1 << self.STATUS_I)
+        self.status |= (1 << self.STATUS_B)
+        self.status |= (1 << 5)  # unused bit of the status register is usually set
 
     def build_opcode_table(self) -> dict[int, Callable[[], None]]:
         """Return a map between opcode and method that contains the logic for the instruction."""
@@ -62,6 +77,28 @@ class CPU6502:
         self.pc += 1
         handler = self.opcodes.get(opcode, self.brk)
         handler()
+
+    def update_zero_flag(self, result: int) -> None:
+        """Update the zero (Z) flag of the status register based on the result of an operation.
+
+        Args:
+            result: Byte resulting from an operation that updates the status register.
+
+        """
+        self.status &= ~(1 << self.STATUS_Z)
+        self.status |= (result == 0) << self.STATUS_Z
+
+    def update_negative_flag(self, result: int) -> None:
+        """Update the negative (N) flag of the status register based on the result of an operation.
+
+        Args:
+            result: Byte resulting from an operation that updates the status register.
+
+        """
+        result_msb = (result >> 7) & 0x01
+        self.status &= ~(1 << self.STATUS_N)
+        self.status |= result_msb << self.STATUS_N
+
 
     def brk(self) -> None:
         """Execute BRK instruction."""
@@ -128,4 +165,5 @@ class CPU6502:
                 # opcode table should never contain an invalid call
                 logger.error(f"Invalid addressing mode {mode.name} for LDA instruction.")
 
-        # TODO: Update status register
+        self.update_zero_flag(self.a)
+        self.update_negative_flag(self.a)
