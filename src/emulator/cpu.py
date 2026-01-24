@@ -4,7 +4,6 @@ import enum
 import logging
 from collections.abc import Callable
 from functools import partial
-from typing import ClassVar, Literal
 
 from emulator.memory import Memory
 
@@ -99,6 +98,66 @@ class CPU6502:
         self.status &= ~(1 << self.STATUS_N)
         self.status |= result_msb << self.STATUS_N
 
+    def resolve_address(self, mode: AddressingMode) -> tuple[int, bool]:
+        """Resolve the effective address for a given addressing mode.
+
+        Args:
+            mode: The addressing mode to resolve.
+            benes_mom: Benes Mom
+
+        Returns:
+            (addr, page_boundary_crossed): The effective memory address and if a page boundary
+            has been crossed by indexing.
+
+        """
+        addr: int
+        page_boundary_crossed = False
+        match mode:
+            case AddressingMode.ZERO_PAGE:
+                addr = self.memory.read(self.pc)
+                self.pc += 1
+            case AddressingMode.ZERO_PAGE_X:
+                zero_page_location = self.memory.read(self.pc)
+                addr = (zero_page_location + self.x) & 0xff
+                self.pc += 1
+            case AddressingMode.ABSOLUTE:
+                addr_base_lo = self.memory.read(self.pc)
+                addr_base_hi = self.memory.read(self.pc + 1)
+                addr = (addr_base_hi << 8) | addr_base_lo
+                self.pc += 2
+            case AddressingMode.ABSOLUTE_X:
+                addr_base_lo = self.memory.read(self.pc)
+                addr_base_hi = self.memory.read(self.pc + 1)
+                addr_base = (addr_base_hi << 8) | addr_base_lo
+                addr = (addr_base + self.x) & 0xffff
+                page_boundary_crossed = (addr_base & 0xff00) != (addr & 0xff00)
+                self.pc += 2
+            case AddressingMode.ABSOLUTE_Y:
+                addr_base_lo = self.memory.read(self.pc)
+                addr_base_hi = self.memory.read(self.pc + 1)
+                addr_base = (addr_base_hi << 8) | addr_base_lo
+                addr = (addr_base + self.y) & 0xffff
+                page_boundary_crossed = (addr_base & 0xff00) != (addr & 0xff00)
+                self.pc += 2
+            case AddressingMode.INDIRECT_X:
+                addr_zp = (self.memory.read(self.pc) + self.x) & 0xff
+                addr_indirect_lo = self.memory.read(addr_zp)
+                addr_indirect_hi = self.memory.read((addr_zp + 1) & 0xff)
+                addr = (addr_indirect_hi << 8) | addr_indirect_lo
+                self.pc += 1
+            case AddressingMode.INDIRECT_Y:
+                addr_zp = self.memory.read(self.pc)
+                addr_base_lo = self.memory.read(addr_zp)
+                addr_base_hi = self.memory.read((addr_zp + 1) & 0xff)
+                addr_base = (addr_base_hi << 8) | addr_base_lo
+                addr = (addr_base + self.y) & 0xffff
+                page_boundary_crossed = (addr_base & 0xff00) != (addr & 0xff00)
+                self.pc += 1
+            case _:
+                msg = f"Can't resolve an address for mode {mode.name}"
+                raise ValueError(msg)
+
+        return addr, page_boundary_crossed
 
     def brk(self) -> None:
         """Execute BRK instruction."""
@@ -106,64 +165,31 @@ class CPU6502:
 
     def lda(self, mode: AddressingMode) -> None:
         """Execute LDA instruction with specified addressing mode."""
-        match (mode):
+        # load value into register
+        page_boundary_crossed = False
+        match mode:
             case AddressingMode.IMMEDIATE:
                 self.a = self.memory.read(self.pc)
                 self.pc += 1
-                self.cycles += 2
-            case AddressingMode.ZERO_PAGE:
-                zero_page_location = self.memory.read(self.pc)
-                self.a = self.memory.read(zero_page_location)
-                self.pc += 1
-                self.cycles += 3
-            case AddressingMode.ZERO_PAGE_X:
-                zero_page_location = self.memory.read(self.pc)
-                self.a = self.memory.read((zero_page_location + self.x) & 0xff)
-                self.pc += 1
-                self.cycles += 4
-            case AddressingMode.ABSOLUTE:
-                addr_lo = self.memory.read(self.pc)
-                addr_hi = self.memory.read(self.pc + 1)
-                addr = (addr_hi << 8) | addr_lo
-                self.a = self.memory.read(addr)
-                self.pc += 2
-                self.cycles += 4
-            case AddressingMode.ABSOLUTE_X:
-                addr_lo = self.memory.read(self.pc)
-                addr_hi = self.memory.read(self.pc + 1)
-                addr = (addr_hi << 8) | addr_lo
-                self.a = self.memory.read((addr + self.x) & 0xffff)
-                self.pc += 2
-                self.cycles += 4 if (addr & 0xff00) == ((addr + self.x) & 0xff00) else 5
-            case AddressingMode.ABSOLUTE_Y:
-                addr_lo = self.memory.read(self.pc)
-                addr_hi = self.memory.read(self.pc + 1)
-                addr = (addr_hi << 8) | addr_lo
-                self.a = self.memory.read((addr + self.y) & 0xffff)
-                self.pc += 2
-                self.cycles += 4 if (addr & 0xff00) == ((addr + self.y) & 0xff00) else 5
-            case AddressingMode.INDIRECT_X:
-                addr_zp = (self.memory.read(self.pc) + self.x) & 0xff
-                addr_indirect_lo = self.memory.read(addr_zp)
-                addr_indirect_hi = self.memory.read((addr_zp + 1) & 0xff)
-                addr_indirect = (addr_indirect_hi << 8) | addr_indirect_lo
-                self.a = self.memory.read(addr_indirect)
-                self.pc += 1
-                self.cycles += 6
-            case AddressingMode.INDIRECT_Y:
-                addr_zp = self.memory.read(self.pc)
-                indirect_base_lo = self.memory.read(addr_zp)
-                indirect_base_hi = self.memory.read((addr_zp + 1) & 0xff)
-                indirect_base = (indirect_base_hi << 8) | indirect_base_lo
-                effective_address = (indirect_base + self.y) & 0xffff
-                page_boundary_crossed = (indirect_base & 0xff00) != (effective_address & 0xff00)
-                self.a = self.memory.read(effective_address)
-                self.pc += 1
-                self.cycles += 5 if not page_boundary_crossed else 6
             case _:
-                # this should not ever be reached when running because the
-                # opcode table should never contain an invalid call
-                logger.error(f"Invalid addressing mode {mode.name} for LDA instruction.")
+                addr, page_boundary_crossed = self.resolve_address(mode)
+                self.a = self.memory.read(addr)
+
+        # update cycle counter
+        cycle_counts = {
+            AddressingMode.IMMEDIATE: 2,
+            AddressingMode.ZERO_PAGE: 3,
+            AddressingMode.ZERO_PAGE_X: 4,
+            AddressingMode.ABSOLUTE: 4,
+            AddressingMode.ABSOLUTE_X: 4,
+            AddressingMode.ABSOLUTE_Y: 4,
+            AddressingMode.INDIRECT_X: 6,
+            AddressingMode.INDIRECT_Y: 5,
+        }
+        extra_cycle_page_boundary = [AddressingMode.ABSOLUTE_X, AddressingMode.ABSOLUTE_Y, AddressingMode.INDIRECT_Y]
+        self.cycles += cycle_counts[mode]
+        if page_boundary_crossed and mode in extra_cycle_page_boundary:
+            self.cycles += 1
 
         self.update_zero_flag(self.a)
         self.update_negative_flag(self.a)
