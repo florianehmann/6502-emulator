@@ -4,7 +4,6 @@ line-length = 120
 [tool.ruff.lint]
 extend-select = ["ALL"]
 ignore = [
-    "Q000",    # double quotes preferred
     "G004",    # logging statement uses f-string
     "TD002",   # missing author in todo
     "TD003",   # missing issue link in todo
@@ -22,8 +21,14 @@ ignore = [
 ]
 
 [tool.ruff.format]
-quote-style = "single"
+quote-style = "double"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+]

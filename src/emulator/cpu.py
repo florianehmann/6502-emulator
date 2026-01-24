@@ -103,7 +103,6 @@ class CPU6502:
 
         Args:
             mode: The addressing mode to resolve.
-            benes_mom: Benes Mom
 
         Returns:
             (addr, page_boundary_crossed): The effective memory address and if a page boundary
