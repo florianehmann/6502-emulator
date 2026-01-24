@@ -16,6 +16,7 @@ class AddressingMode(enum.Enum):
     IMMEDIATE = enum.auto()
     ZERO_PAGE = enum.auto()
     ZERO_PAGE_X = enum.auto()
+    ZERO_PAGE_Y = enum.auto()
     ABSOLUTE = enum.auto()
     ABSOLUTE_X = enum.auto()
     ABSOLUTE_Y = enum.auto()
@@ -57,14 +58,24 @@ class CPU6502:
     def build_opcode_table(self) -> dict[int, Callable[[], None]]:
         """Return a map between opcode and method that contains the logic for the instruction."""
         return {
+            0xa0: partial(self.ldy, mode=AddressingMode.IMMEDIATE),
             0xa1: partial(self.lda, mode=AddressingMode.INDIRECT_X),
+            0xa2: partial(self.ldx, mode=AddressingMode.IMMEDIATE),
+            0xa4: partial(self.ldy, mode=AddressingMode.ZERO_PAGE),
             0xa5: partial(self.lda, mode=AddressingMode.ZERO_PAGE),
-            0xad: partial(self.lda, mode=AddressingMode.ABSOLUTE),
+            0xa6: partial(self.ldx, mode=AddressingMode.ZERO_PAGE),
             0xa9: partial(self.lda, mode=AddressingMode.IMMEDIATE),
+            0xac: partial(self.ldy, mode=AddressingMode.ABSOLUTE),
+            0xad: partial(self.lda, mode=AddressingMode.ABSOLUTE),
+            0xae: partial(self.ldx, mode=AddressingMode.ABSOLUTE),
             0xb1: partial(self.lda, mode=AddressingMode.INDIRECT_Y),
+            0xb4: partial(self.ldy, mode=AddressingMode.ZERO_PAGE_X),
             0xb5: partial(self.lda, mode=AddressingMode.ZERO_PAGE_X),
+            0xb6: partial(self.ldx, mode=AddressingMode.ZERO_PAGE_Y),
             0xb9: partial(self.lda, mode=AddressingMode.ABSOLUTE_Y),
+            0xbc: partial(self.ldy, mode=AddressingMode.ABSOLUTE_X),
             0xbd: partial(self.lda, mode=AddressingMode.ABSOLUTE_X),
+            0xbe: partial(self.ldx, mode=AddressingMode.ABSOLUTE_Y),
         }
 
     def step(self) -> None:
@@ -98,7 +109,7 @@ class CPU6502:
         self.status &= ~(1 << self.STATUS_N)
         self.status |= result_msb << self.STATUS_N
 
-    def resolve_address(self, mode: AddressingMode) -> tuple[int, bool]:
+    def resolve_address(self, mode: AddressingMode) -> tuple[int, bool]:  # noqa: PLR0915
         """Resolve the effective address for a given addressing mode.
 
         Args:
@@ -118,6 +129,10 @@ class CPU6502:
             case AddressingMode.ZERO_PAGE_X:
                 zero_page_location = self.memory.read(self.pc)
                 addr = (zero_page_location + self.x) & 0xff
+                self.pc += 1
+            case AddressingMode.ZERO_PAGE_Y:
+                zero_page_location = self.memory.read(self.pc)
+                addr = (zero_page_location + self.y) & 0xff
                 self.pc += 1
             case AddressingMode.ABSOLUTE:
                 addr_base_lo = self.memory.read(self.pc)
@@ -192,3 +207,59 @@ class CPU6502:
 
         self.update_zero_flag(self.a)
         self.update_negative_flag(self.a)
+
+    def ldx(self, mode: AddressingMode) -> None:
+        """Execute LDX instruction with specified addressing mode."""
+        # load value into register
+        page_boundary_crossed = False
+        match mode:
+            case AddressingMode.IMMEDIATE:
+                self.x = self.memory.read(self.pc)
+                self.pc += 1
+            case _:
+                addr, page_boundary_crossed = self.resolve_address(mode)
+                self.x = self.memory.read(addr)
+
+        # update cycle counter
+        cycle_counts = {
+            AddressingMode.IMMEDIATE: 2,
+            AddressingMode.ZERO_PAGE: 3,
+            AddressingMode.ZERO_PAGE_Y: 4,
+            AddressingMode.ABSOLUTE: 4,
+            AddressingMode.ABSOLUTE_Y: 4,
+        }
+        extra_cycle_page_boundary = [AddressingMode.ABSOLUTE_Y]
+        self.cycles += cycle_counts[mode]
+        if page_boundary_crossed and mode in extra_cycle_page_boundary:
+            self.cycles += 1
+
+        self.update_zero_flag(self.x)
+        self.update_negative_flag(self.x)
+
+    def ldy(self, mode: AddressingMode) -> None:
+        """Execute LDY instruction with specified addressing mode."""
+        # load value into register
+        page_boundary_crossed = False
+        match mode:
+            case AddressingMode.IMMEDIATE:
+                self.y = self.memory.read(self.pc)
+                self.pc += 1
+            case _:
+                addr, page_boundary_crossed = self.resolve_address(mode)
+                self.y = self.memory.read(addr)
+
+        # update cycle counter
+        cycle_counts = {
+            AddressingMode.IMMEDIATE: 2,
+            AddressingMode.ZERO_PAGE: 3,
+            AddressingMode.ZERO_PAGE_X: 4,
+            AddressingMode.ABSOLUTE: 4,
+            AddressingMode.ABSOLUTE_X: 4,
+        }
+        extra_cycle_page_boundary = [AddressingMode.ABSOLUTE_X]
+        self.cycles += cycle_counts[mode]
+        if page_boundary_crossed and mode in extra_cycle_page_boundary:
+            self.cycles += 1
+
+        self.update_zero_flag(self.y)
+        self.update_negative_flag(self.y)

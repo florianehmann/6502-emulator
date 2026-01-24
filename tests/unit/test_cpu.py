@@ -34,6 +34,14 @@ def test_zero_page_x_addressing(cpu: CPU6502):  # noqa: D103
     assert resolved_address == ZERO_PAGE_LOCATION + INDEX
     assert not page_boundary_crossed
 
+def test_zero_page_y_addressing(cpu: CPU6502):  # noqa: D103
+    cpu.pc = 1
+    cpu.y = INDEX
+    cpu.memory.write(1, ZERO_PAGE_LOCATION)
+    resolved_address, page_boundary_crossed = cpu.resolve_address(AddressingMode.ZERO_PAGE_Y)
+    assert resolved_address == ZERO_PAGE_LOCATION + INDEX
+    assert not page_boundary_crossed
+
 def test_absolute_addressing(cpu: CPU6502):  # noqa: D103
     cpu.pc = 1
     cpu.memory.write(1, ABSOLUTE_LOCATION & 0xff)
@@ -122,4 +130,38 @@ def test_lda_absolute_x(cpu: CPU6502):  # noqa: D103
     cpu.lda(AddressingMode.ABSOLUTE_X)
 
     assert cpu.a == TEST_VALUE
+    assert cpu.cycles == 5  # noqa: PLR2004
+
+def test_ldx_immediate(cpu: CPU6502):  # noqa: D103
+    cpu.memory.write(0, TEST_VALUE)
+    cpu.ldx(AddressingMode.IMMEDIATE)
+
+    assert cpu.x == TEST_VALUE
+    assert cpu.cycles == 2  # noqa: PLR2004
+
+def test_ldx_absolute_y(cpu: CPU6502):  # noqa: D103
+    cpu.memory.write(0, ABSOLUTE_LOCATION & 0xff)
+    cpu.memory.write(1, (ABSOLUTE_LOCATION >> 8) & 0xff)
+    cpu.memory.write(ABSOLUTE_LOCATION + PAGE_CROSS_INDEX, TEST_VALUE)
+    cpu.y = PAGE_CROSS_INDEX
+    cpu.ldx(AddressingMode.ABSOLUTE_Y)
+
+    assert cpu.x == TEST_VALUE
+    assert cpu.cycles == 5  # noqa: PLR2004
+
+def test_ldy_immediate(cpu: CPU6502):  # noqa: D103
+    cpu.memory.write(0, TEST_VALUE)
+    cpu.ldy(AddressingMode.IMMEDIATE)
+
+    assert cpu.y == TEST_VALUE
+    assert cpu.cycles == 2  # noqa: PLR2004
+
+def test_ldy_absolute_x(cpu: CPU6502):  # noqa: D103
+    cpu.memory.write(0, ABSOLUTE_LOCATION & 0xff)
+    cpu.memory.write(1, (ABSOLUTE_LOCATION >> 8) & 0xff)
+    cpu.memory.write(ABSOLUTE_LOCATION + PAGE_CROSS_INDEX, TEST_VALUE)
+    cpu.x = PAGE_CROSS_INDEX
+    cpu.ldy(AddressingMode.ABSOLUTE_X)
+
+    assert cpu.y == TEST_VALUE
     assert cpu.cycles == 5  # noqa: PLR2004
