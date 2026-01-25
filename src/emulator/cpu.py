@@ -6,6 +6,7 @@ from collections.abc import Callable
 from functools import partial
 
 from emulator.memory import Memory
+from emulator.utils import assert_never
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +124,9 @@ class CPU6502:
         addr: int
         page_boundary_crossed = False
         match mode:
+            case AddressingMode.IMMEDIATE:
+                addr = self.pc
+                self.pc += 1
             case AddressingMode.ZERO_PAGE:
                 addr = self.memory.read(self.pc)
                 self.pc += 1
@@ -168,8 +172,7 @@ class CPU6502:
                 page_boundary_crossed = (addr_base & 0xff00) != (addr & 0xff00)
                 self.pc += 1
             case _:
-                msg = f"Can't resolve an address for mode {mode.name}"
-                raise ValueError(msg)
+                assert_never(mode)
 
         return addr, page_boundary_crossed
 
@@ -180,14 +183,8 @@ class CPU6502:
     def lda(self, mode: AddressingMode) -> None:
         """Execute LDA instruction with specified addressing mode."""
         # load value into register
-        page_boundary_crossed = False
-        match mode:
-            case AddressingMode.IMMEDIATE:
-                self.a = self.memory.read(self.pc)
-                self.pc += 1
-            case _:
-                addr, page_boundary_crossed = self.resolve_address(mode)
-                self.a = self.memory.read(addr)
+        addr, page_boundary_crossed = self.resolve_address(mode)
+        self.a = self.memory.read(addr)
 
         # update cycle counter
         cycle_counts = {
@@ -211,14 +208,8 @@ class CPU6502:
     def ldx(self, mode: AddressingMode) -> None:
         """Execute LDX instruction with specified addressing mode."""
         # load value into register
-        page_boundary_crossed = False
-        match mode:
-            case AddressingMode.IMMEDIATE:
-                self.x = self.memory.read(self.pc)
-                self.pc += 1
-            case _:
-                addr, page_boundary_crossed = self.resolve_address(mode)
-                self.x = self.memory.read(addr)
+        addr, page_boundary_crossed = self.resolve_address(mode)
+        self.x = self.memory.read(addr)
 
         # update cycle counter
         cycle_counts = {
@@ -239,14 +230,8 @@ class CPU6502:
     def ldy(self, mode: AddressingMode) -> None:
         """Execute LDY instruction with specified addressing mode."""
         # load value into register
-        page_boundary_crossed = False
-        match mode:
-            case AddressingMode.IMMEDIATE:
-                self.y = self.memory.read(self.pc)
-                self.pc += 1
-            case _:
-                addr, page_boundary_crossed = self.resolve_address(mode)
-                self.y = self.memory.read(addr)
+        addr, page_boundary_crossed = self.resolve_address(mode)
+        self.y = self.memory.read(addr)
 
         # update cycle counter
         cycle_counts = {
