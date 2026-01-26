@@ -59,6 +59,8 @@ class CPU6502:
     def build_opcode_table(self) -> dict[int, Callable[[], None]]:
         """Return a map between opcode and method that contains the logic for the instruction."""
         return {
+            0x18: self.clc,
+            0x38: self.sec,
             0xa0: partial(self.ldy, mode=AddressingMode.IMMEDIATE),
             0xa1: partial(self.lda, mode=AddressingMode.INDIRECT_X),
             0xa2: partial(self.ldx, mode=AddressingMode.IMMEDIATE),
@@ -179,6 +181,16 @@ class CPU6502:
     def brk(self) -> None:
         """Execute BRK instruction."""
         logger.info(f"Unhandled opcode at {self.pc-1:04x}")
+
+    def clc(self) -> None:
+        """Execute the CLear Carry (CLC) instruction."""
+        self.status &= ~(1 << self.STATUS_C)
+        self.cycles += 2
+
+    def sec(self) -> None:
+        """Execute the SEt Carry (SEC) instruction."""
+        self.status |= (1 << self.STATUS_C)
+        self.cycles += 2
 
     def lda(self, mode: AddressingMode) -> None:
         """Execute LDA instruction with specified addressing mode."""

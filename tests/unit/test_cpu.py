@@ -114,6 +114,20 @@ def test_indirect_y_addressing_with_page_cross(cpu: CPU6502):  # noqa: D103
     assert resolved_address == INDIRECT_DATA_LOCATION + PAGE_CROSS_INDEX
     assert page_boundary_crossed
 
+def test_clc(cpu: CPU6502):
+    cpu.status |= (1 << CPU6502.STATUS_C)
+    assert cpu.status & (1 << CPU6502.STATUS_C) > 0
+    cpu.clc()
+    assert cpu.status & (1 << CPU6502.STATUS_C) == 0
+    assert cpu.cycles == 2
+
+def test_sec(cpu: CPU6502):
+    cpu.status &= ~(1 << CPU6502.STATUS_C)
+    assert cpu.status & (1 << CPU6502.STATUS_C) == 0
+    cpu.sec()
+    assert cpu.status & (1 << CPU6502.STATUS_C) > 0
+    assert cpu.cycles == 2
+
 def test_lda_absolute_x(cpu: CPU6502):  # noqa: D103
     cpu.memory.write(0, ABSOLUTE_LOCATION & 0xff)
     cpu.memory.write(1, (ABSOLUTE_LOCATION >> 8) & 0xff)
