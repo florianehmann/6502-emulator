@@ -25,6 +25,13 @@ class AddressingMode(enum.Enum):
     INDIRECT_Y = enum.auto()
 
 
+class StepResult(enum.Enum):
+    """Result of a CPU fetch/execute step."""
+
+    NORMAL = enum.auto()
+    BRK = enum.auto()
+
+
 class CPU6502:
     """A behavioral model of the MOS6502."""
 
@@ -35,6 +42,8 @@ class CPU6502:
     STATUS_B = 4
     STATUS_V = 6
     STATUS_N = 7
+
+    STACK_ROOT = 0x0100
 
     def __init__(self, memory: Memory) -> None:
         """Initialize a CPU with memory."""
@@ -53,12 +62,12 @@ class CPU6502:
         # initial values for the status register
         self.status |= (1 << self.STATUS_Z)
         self.status |= (1 << self.STATUS_I)
-        self.status |= (1 << self.STATUS_B)
         self.status |= (1 << 5)  # unused bit of the status register is usually set
 
     def build_opcode_table(self) -> dict[int, Callable[[], None]]:
         """Return a map between opcode and method that contains the logic for the instruction."""
         return {
+            0x00: self.brk,
             0x18: self.clc,
             0x38: self.sec,
             0x58: self.cli,
@@ -96,15 +105,22 @@ class CPU6502:
             0xf8: self.sed,
         }
 
-    def step(self) -> None:
+    def step(self) -> StepResult:
         """Step one CPU tick.
 
         This function executes the next CPU instruction.
         """
         opcode = self.memory.read(self.pc)
+        if opcode not in self.opcodes:
+            logger.warning(f"Unhandled opcode at ${self.pc:04x}")
         self.pc += 1
         handler = self.opcodes.get(opcode, self.brk)
         handler()
+
+        if self.status & (1 << self.STATUS_I) > 0 and self.status & (1 << self.STATUS_B) > 0:
+            self.status &= ~(1 << self.STATUS_B)
+            return StepResult.BRK
+        return StepResult.NORMAL
 
     def update_zero_flag(self, result: int) -> None:
         """Update the zero (Z) flag of the status register based on the result of an operation.
@@ -193,9 +209,40 @@ class CPU6502:
 
         return addr, page_boundary_crossed
 
+    def push_byte_to_stack(self, byte: int) -> None:
+        """Push a byte to the stack and update stack pointer.
+
+        Note: This method does not update the status register or perform underflow checks.
+
+        Args:
+            byte: Byte to push onto the stack.
+
+        """
+        self.memory.write(self.STACK_ROOT + self.sp, byte)
+        self.sp = (self.sp - 1) & 0xff
+
+    def pull_byte_from_stack(self) -> int:
+        """Pull a byte from the stack and update the stack pointer.
+
+        Note: This method does not update the status register or perform overflow checks.
+
+        Returns:
+            byte: Byte to push onto the stack.
+
+        """
+        self.sp = (self.sp + 1) & 0xff
+        return self.memory.read(self.STACK_ROOT + self.sp)
+
     def brk(self) -> None:
         """Execute BRK instruction."""
-        logger.info(f"Unhandled opcode at {self.pc-1:04x}")
+        self.status |= (1 << self.STATUS_I) | (1 << self.STATUS_B)
+        self.pc += 1
+        self.cycles += 7
+        pc_lo = self.pc & 0xff
+        pc_hi = (self.pc >> 8) & 0xff
+        self.push_byte_to_stack(pc_hi)
+        self.push_byte_to_stack(pc_lo)
+        self.push_byte_to_stack(self.status)
 
     # Flag instructions
 

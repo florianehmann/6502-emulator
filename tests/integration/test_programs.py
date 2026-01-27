@@ -1,0 +1,30 @@
+"""Test simple 6502 machine code to exercise instructions in combination."""
+
+import pytest
+
+from emulator.cpu import CPU6502, StepResult
+
+
+def test_minimal_program(cpu: CPU6502):
+    """Test basic program execution functionality."""
+    cpu.memory.write_bytes_hex(0x200, "a9 01")     # LDA #$01
+    cpu.memory.write_bytes_hex(0x202, "8d 00 02")  # STA $0200
+    cpu.memory.write_bytes_hex(0x205, "a9 05")     # LDA #$05
+    cpu.memory.write_bytes_hex(0x207, "8d 01 02")  # STA $0201
+    cpu.memory.write_bytes_hex(0x20a, "00")        # BRK
+    cpu.pc = 0x200
+    steps = 0
+    while True:
+        result = cpu.step()
+        steps += 1
+
+        if result == StepResult.BRK:
+            break
+
+        if steps > 10:  # noqa: PLR2004
+            pytest.fail("Program didn't halt.")
+
+    assert cpu.a == 5  # noqa: PLR2004
+    assert cpu.memory.read(0x0200) == 1
+    assert cpu.memory.read(0x0201) == 5  # noqa: PLR2004
+    assert cpu.cycles == 19  # noqa: PLR2004
