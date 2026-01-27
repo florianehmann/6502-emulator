@@ -39,7 +39,7 @@ class CPU6502:
     def __init__(self, memory: Memory) -> None:
         """Initialize a CPU with memory."""
         # Registers
-        self.a:int  = 0
+        self.a: int = 0
         self.x: int = 0
         self.y: int = 0
         self.pc: int = 0
@@ -61,6 +61,8 @@ class CPU6502:
         return {
             0x18: self.clc,
             0x38: self.sec,
+            0x58: self.cli,
+            0x78: self.sei,
             0xa0: partial(self.ldy, mode=AddressingMode.IMMEDIATE),
             0xa1: partial(self.lda, mode=AddressingMode.INDIRECT_X),
             0xa2: partial(self.ldx, mode=AddressingMode.IMMEDIATE),
@@ -75,10 +77,13 @@ class CPU6502:
             0xb4: partial(self.ldy, mode=AddressingMode.ZERO_PAGE_X),
             0xb5: partial(self.lda, mode=AddressingMode.ZERO_PAGE_X),
             0xb6: partial(self.ldx, mode=AddressingMode.ZERO_PAGE_Y),
+            0xb8: self.clv,
             0xb9: partial(self.lda, mode=AddressingMode.ABSOLUTE_Y),
             0xbc: partial(self.ldy, mode=AddressingMode.ABSOLUTE_X),
             0xbd: partial(self.lda, mode=AddressingMode.ABSOLUTE_X),
             0xbe: partial(self.ldx, mode=AddressingMode.ABSOLUTE_Y),
+            0xd8: self.cld,
+            0xf8: self.sed,
         }
 
     def step(self) -> None:
@@ -182,6 +187,8 @@ class CPU6502:
         """Execute BRK instruction."""
         logger.info(f"Unhandled opcode at {self.pc-1:04x}")
 
+    # Flag instructions
+
     def clc(self) -> None:
         """Execute the CLear Carry (CLC) instruction."""
         self.status &= ~(1 << self.STATUS_C)
@@ -191,6 +198,33 @@ class CPU6502:
         """Execute the SEt Carry (SEC) instruction."""
         self.status |= (1 << self.STATUS_C)
         self.cycles += 2
+
+    def cli(self) -> None:
+        """Execute the CLear Interrupt (CLI) instruction."""
+        self.status &= ~(1 << self.STATUS_I)
+        self.cycles += 2
+
+    def sei(self) -> None:
+        """Execute the SEt Interrupt (SEI) instruction."""
+        self.status |= (1 << self.STATUS_I)
+        self.cycles += 2
+
+    def cld(self) -> None:
+        """Execute the CLear Decimal (CLD) instruction."""
+        self.status &= ~(1 << self.STATUS_D)
+        self.cycles += 2
+
+    def sed(self) -> None:
+        """Execute the SEt Decimal (SED) instruction."""
+        self.status |= (1 << self.STATUS_D)
+        self.cycles += 2
+
+    def clv(self) -> None:
+        """Execute the CLear oVerflow (CLV) instruction."""
+        self.status &= ~(1 << self.STATUS_V)
+        self.cycles += 2
+
+    # Register loading
 
     def lda(self, mode: AddressingMode) -> None:
         """Execute LDA instruction with specified addressing mode."""

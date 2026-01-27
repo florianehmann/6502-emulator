@@ -12,11 +12,15 @@ INDIRECT_DATA_LOCATION_ZERO_PAGE = 0x10
 INDIRECT_DATA_LOCATION = 0x0110
 TEST_VALUE = 0xfe
 
+# Address resolution
+
+
 def test_immediate_addressing(cpu: CPU6502):  # noqa: D103
     cpu.pc = 1
     resolved_address, page_boundary_crossed = cpu.resolve_address(AddressingMode.IMMEDIATE)
     assert resolved_address == 1
     assert not page_boundary_crossed
+
 
 def test_zero_page_addressing(cpu: CPU6502):  # noqa: D103
     cpu.pc = 1
@@ -24,6 +28,7 @@ def test_zero_page_addressing(cpu: CPU6502):  # noqa: D103
     resolved_address, page_boundary_crossed = cpu.resolve_address(AddressingMode.ZERO_PAGE)
     assert resolved_address == ZERO_PAGE_LOCATION
     assert not page_boundary_crossed
+
 
 def test_zero_page_x_addressing(cpu: CPU6502):  # noqa: D103
     cpu.pc = 1
@@ -33,6 +38,7 @@ def test_zero_page_x_addressing(cpu: CPU6502):  # noqa: D103
     assert resolved_address == ZERO_PAGE_LOCATION + INDEX
     assert not page_boundary_crossed
 
+
 def test_zero_page_y_addressing(cpu: CPU6502):  # noqa: D103
     cpu.pc = 1
     cpu.y = INDEX
@@ -41,6 +47,7 @@ def test_zero_page_y_addressing(cpu: CPU6502):  # noqa: D103
     assert resolved_address == ZERO_PAGE_LOCATION + INDEX
     assert not page_boundary_crossed
 
+
 def test_absolute_addressing(cpu: CPU6502):  # noqa: D103
     cpu.pc = 1
     cpu.memory.write(1, ABSOLUTE_LOCATION & 0xff)
@@ -48,6 +55,7 @@ def test_absolute_addressing(cpu: CPU6502):  # noqa: D103
     resolved_address, page_boundary_crossed = cpu.resolve_address(AddressingMode.ABSOLUTE)
     assert resolved_address == ABSOLUTE_LOCATION
     assert not page_boundary_crossed
+
 
 def test_absolute_x_addressing(cpu: CPU6502):  # noqa: D103
     cpu.pc = 1
@@ -58,6 +66,7 @@ def test_absolute_x_addressing(cpu: CPU6502):  # noqa: D103
     assert resolved_address == ABSOLUTE_LOCATION + INDEX
     assert not page_boundary_crossed
 
+
 def test_absolute_x_addressing_with_page_cross(cpu: CPU6502):  # noqa: D103
     cpu.pc = 1
     cpu.x = PAGE_CROSS_INDEX
@@ -66,6 +75,7 @@ def test_absolute_x_addressing_with_page_cross(cpu: CPU6502):  # noqa: D103
     resolved_address, page_boundary_crossed = cpu.resolve_address(AddressingMode.ABSOLUTE_X)
     assert resolved_address == ABSOLUTE_LOCATION + PAGE_CROSS_INDEX
     assert page_boundary_crossed
+
 
 def test_absolute_y_addressing(cpu: CPU6502):  # noqa: D103
     cpu.pc = 1
@@ -76,6 +86,7 @@ def test_absolute_y_addressing(cpu: CPU6502):  # noqa: D103
     assert resolved_address == ABSOLUTE_LOCATION + INDEX
     assert not page_boundary_crossed
 
+
 def test_absolute_y_addressing_with_page_cross(cpu: CPU6502):  # noqa: D103
     cpu.pc = 1
     cpu.y = PAGE_CROSS_INDEX
@@ -85,6 +96,7 @@ def test_absolute_y_addressing_with_page_cross(cpu: CPU6502):  # noqa: D103
     assert resolved_address == ABSOLUTE_LOCATION + PAGE_CROSS_INDEX
     assert page_boundary_crossed
 
+
 def test_indirect_x_addressing(cpu: CPU6502):  # noqa: D103
     cpu.pc = 1
     cpu.x = INDEX
@@ -93,6 +105,7 @@ def test_indirect_x_addressing(cpu: CPU6502):  # noqa: D103
     resolved_address, page_boundary_crossed = cpu.resolve_address(AddressingMode.INDIRECT_X)
     assert resolved_address == INDIRECT_DATA_LOCATION_ZERO_PAGE
     assert not page_boundary_crossed
+
 
 def test_indirect_y_addressing(cpu: CPU6502):  # noqa: D103
     cpu.pc = 1
@@ -104,6 +117,7 @@ def test_indirect_y_addressing(cpu: CPU6502):  # noqa: D103
     assert resolved_address == INDIRECT_DATA_LOCATION + INDEX
     assert not page_boundary_crossed
 
+
 def test_indirect_y_addressing_with_page_cross(cpu: CPU6502):  # noqa: D103
     cpu.pc = 1
     cpu.y = PAGE_CROSS_INDEX
@@ -114,19 +128,65 @@ def test_indirect_y_addressing_with_page_cross(cpu: CPU6502):  # noqa: D103
     assert resolved_address == INDIRECT_DATA_LOCATION + PAGE_CROSS_INDEX
     assert page_boundary_crossed
 
-def test_clc(cpu: CPU6502):
-    cpu.status |= (1 << CPU6502.STATUS_C)
+# Flag instructions
+
+
+def test_clc(cpu: CPU6502):  # noqa: D103
+    cpu.status |= 1 << CPU6502.STATUS_C
     assert cpu.status & (1 << CPU6502.STATUS_C) > 0
     cpu.clc()
     assert cpu.status & (1 << CPU6502.STATUS_C) == 0
-    assert cpu.cycles == 2
+    assert cpu.cycles == 2  # noqa: PLR2004
 
-def test_sec(cpu: CPU6502):
+
+def test_sec(cpu: CPU6502):  # noqa: D103
     cpu.status &= ~(1 << CPU6502.STATUS_C)
     assert cpu.status & (1 << CPU6502.STATUS_C) == 0
     cpu.sec()
     assert cpu.status & (1 << CPU6502.STATUS_C) > 0
-    assert cpu.cycles == 2
+    assert cpu.cycles == 2  # noqa: PLR2004
+
+
+def test_cli(cpu: CPU6502):  # noqa: D103
+    cpu.status |= 1 << CPU6502.STATUS_I
+    assert cpu.status & (1 << CPU6502.STATUS_I) > 0
+    cpu.cli()
+    assert cpu.status & (1 << CPU6502.STATUS_I) == 0
+    assert cpu.cycles == 2  # noqa: PLR2004
+
+
+def test_sei(cpu: CPU6502):  # noqa: D103
+    cpu.status &= ~(1 << CPU6502.STATUS_I)
+    assert cpu.status & (1 << CPU6502.STATUS_I) == 0
+    cpu.sei()
+    assert cpu.status & (1 << CPU6502.STATUS_I) > 0
+    assert cpu.cycles == 2  # noqa: PLR2004
+
+def test_cld(cpu: CPU6502):  # noqa: D103
+    cpu.status |= 1 << CPU6502.STATUS_D
+    assert cpu.status & (1 << CPU6502.STATUS_D) > 0
+    cpu.cld()
+    assert cpu.status & (1 << CPU6502.STATUS_D) == 0
+    assert cpu.cycles == 2  # noqa: PLR2004
+
+
+def test_sed(cpu: CPU6502):  # noqa: D103
+    cpu.status &= ~(1 << CPU6502.STATUS_D)
+    assert cpu.status & (1 << CPU6502.STATUS_D) == 0
+    cpu.sed()
+    assert cpu.status & (1 << CPU6502.STATUS_D) > 0
+    assert cpu.cycles == 2  # noqa: PLR2004
+
+
+def test_clv(cpu: CPU6502):  # noqa: D103
+    cpu.status |= 1 << CPU6502.STATUS_V
+    assert cpu.status & (1 << CPU6502.STATUS_V) > 0
+    cpu.clv()
+    assert cpu.status & (1 << CPU6502.STATUS_V) == 0
+    assert cpu.cycles == 2  # noqa: PLR2004
+
+# Register loading
+
 
 def test_lda_absolute_x(cpu: CPU6502):  # noqa: D103
     cpu.memory.write(0, ABSOLUTE_LOCATION & 0xff)
@@ -138,6 +198,7 @@ def test_lda_absolute_x(cpu: CPU6502):  # noqa: D103
     assert cpu.a == TEST_VALUE
     assert cpu.cycles == 5  # noqa: PLR2004
 
+
 def test_ldx_absolute_y(cpu: CPU6502):  # noqa: D103
     cpu.memory.write(0, ABSOLUTE_LOCATION & 0xff)
     cpu.memory.write(1, (ABSOLUTE_LOCATION >> 8) & 0xff)
@@ -147,6 +208,7 @@ def test_ldx_absolute_y(cpu: CPU6502):  # noqa: D103
 
     assert cpu.x == TEST_VALUE
     assert cpu.cycles == 5  # noqa: PLR2004
+
 
 def test_ldy_absolute_x(cpu: CPU6502):  # noqa: D103
     cpu.memory.write(0, ABSOLUTE_LOCATION & 0xff)
