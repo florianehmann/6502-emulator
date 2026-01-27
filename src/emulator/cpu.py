@@ -63,6 +63,16 @@ class CPU6502:
             0x38: self.sec,
             0x58: self.cli,
             0x78: self.sei,
+            0x81: partial(self.sta, mode=AddressingMode.INDIRECT_X),
+            0x85: partial(self.sta, mode=AddressingMode.ZERO_PAGE),
+            0x86: partial(self.stx, mode=AddressingMode.ZERO_PAGE),
+            0x8d: partial(self.sta, mode=AddressingMode.ABSOLUTE),
+            0x8e: partial(self.stx, mode=AddressingMode.ABSOLUTE),
+            0x91: partial(self.sta, mode=AddressingMode.INDIRECT_Y),
+            0x95: partial(self.sta, mode=AddressingMode.ZERO_PAGE_X),
+            0x96: partial(self.stx, mode=AddressingMode.ZERO_PAGE_Y),
+            0x99: partial(self.sta, mode=AddressingMode.ABSOLUTE_Y),
+            0x9d: partial(self.sta, mode=AddressingMode.ABSOLUTE_X),
             0xa0: partial(self.ldy, mode=AddressingMode.IMMEDIATE),
             0xa1: partial(self.lda, mode=AddressingMode.INDIRECT_X),
             0xa2: partial(self.ldx, mode=AddressingMode.IMMEDIATE),
@@ -294,3 +304,51 @@ class CPU6502:
 
         self.update_zero_flag(self.y)
         self.update_negative_flag(self.y)
+
+    # Register storing
+
+    def sta(self, mode: AddressingMode) -> None:
+        """Execute the STore A (STA) instruction."""
+        # write register value to memory
+        addr, _ = self.resolve_address(mode)
+        self.memory.write(addr, self.a)
+
+        # update cycle counter
+        cycle_counts = {
+            AddressingMode.ZERO_PAGE: 3,
+            AddressingMode.ZERO_PAGE_X: 4,
+            AddressingMode.ABSOLUTE: 4,
+            AddressingMode.ABSOLUTE_X: 5,
+            AddressingMode.ABSOLUTE_Y: 5,
+            AddressingMode.INDIRECT_X: 6,
+            AddressingMode.INDIRECT_Y: 6,
+        }
+        self.cycles += cycle_counts[mode]
+
+    def stx(self, mode: AddressingMode) -> None:
+        """Execute the STore X (STX) instruction."""
+        # write register value to memory
+        addr, _ = self.resolve_address(mode)
+        self.memory.write(addr, self.x)
+
+        # update cycle counter
+        cycle_counts = {
+            AddressingMode.ZERO_PAGE: 3,
+            AddressingMode.ZERO_PAGE_Y: 4,
+            AddressingMode.ABSOLUTE: 4,
+        }
+        self.cycles += cycle_counts[mode]
+
+    def sty(self, mode: AddressingMode) -> None:
+        """Execute the STore Y (STY) instruction."""
+        # write register value to memory
+        addr, _ = self.resolve_address(mode)
+        self.memory.write(addr, self.y)
+
+        # update cycle counter
+        cycle_counts = {
+            AddressingMode.ZERO_PAGE: 3,
+            AddressingMode.ZERO_PAGE_X: 4,
+            AddressingMode.ABSOLUTE: 4,
+        }
+        self.cycles += cycle_counts[mode]
