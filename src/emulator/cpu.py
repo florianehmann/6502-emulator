@@ -75,6 +75,7 @@ class CPU6502:
             0x81: partial(self.sta, mode=AddressingMode.INDIRECT_X),
             0x85: partial(self.sta, mode=AddressingMode.ZERO_PAGE),
             0x86: partial(self.stx, mode=AddressingMode.ZERO_PAGE),
+            0x88: self.dey,
             0x8d: partial(self.sta, mode=AddressingMode.ABSOLUTE),
             0x8e: partial(self.stx, mode=AddressingMode.ABSOLUTE),
             0x91: partial(self.sta, mode=AddressingMode.INDIRECT_Y),
@@ -101,6 +102,11 @@ class CPU6502:
             0xbc: partial(self.ldy, mode=AddressingMode.ABSOLUTE_X),
             0xbd: partial(self.lda, mode=AddressingMode.ABSOLUTE_X),
             0xbe: partial(self.ldx, mode=AddressingMode.ABSOLUTE_Y),
+            0xc6: partial(self.dec, mode=AddressingMode.ZERO_PAGE),
+            0xca: self.dex,
+            0xce: partial(self.dec, mode=AddressingMode.ABSOLUTE),
+            0xd6: partial(self.dec, mode=AddressingMode.ZERO_PAGE_X),
+            0xde: partial(self.dec, mode=AddressingMode.ABSOLUTE),
             0xd8: self.cld,
             0xf8: self.sed,
         }
@@ -399,3 +405,42 @@ class CPU6502:
             AddressingMode.ABSOLUTE: 4,
         }
         self.cycles += cycle_counts[mode]
+
+    # Unary arithmetic
+
+    def dec(self, mode: AddressingMode) -> None:
+        """Execute the DECrement (DEC) instruction."""
+        addr, _ = self.resolve_address(mode)
+        byte = self.memory.read(addr)
+        byte = (byte - 1) & 0xff
+        self.memory.write(addr, byte)
+
+        # update cycle counter
+        cycle_counts = {
+            AddressingMode.ZERO_PAGE: 5,
+            AddressingMode.ZERO_PAGE_X: 6,
+            AddressingMode.ABSOLUTE: 6,
+            AddressingMode.ABSOLUTE_X: 7,
+        }
+        self.cycles += cycle_counts[mode]
+
+        self.update_zero_flag(byte)
+        self.update_negative_flag(byte)
+
+    def dex(self) -> None:
+        """Execute the DEcrement X (DEX) instruction."""
+        self.x = (self.x - 1) & 0xff
+
+        self.cycles += 2
+
+        self.update_zero_flag(self.x)
+        self.update_negative_flag(self.x)
+
+    def dey(self) -> None:
+        """Execute the DEcrement Y (DEY) instruction."""
+        self.y = (self.y - 1) & 0xff
+
+        self.cycles += 2
+
+        self.update_zero_flag(self.y)
+        self.update_negative_flag(self.y)
