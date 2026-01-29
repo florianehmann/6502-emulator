@@ -103,12 +103,18 @@ class CPU6502:
             0xbd: partial(self.lda, mode=AddressingMode.ABSOLUTE_X),
             0xbe: partial(self.ldx, mode=AddressingMode.ABSOLUTE_Y),
             0xc6: partial(self.dec, mode=AddressingMode.ZERO_PAGE),
+            0xc8: self.iny,
             0xca: self.dex,
             0xce: partial(self.dec, mode=AddressingMode.ABSOLUTE),
             0xd6: partial(self.dec, mode=AddressingMode.ZERO_PAGE_X),
             0xde: partial(self.dec, mode=AddressingMode.ABSOLUTE),
             0xd8: self.cld,
+            0xe6: partial(self.inc, mode=AddressingMode.ZERO_PAGE),
+            0xe8: self.inx,
+            0xee: partial(self.inc, mode=AddressingMode.ABSOLUTE),
+            0xf6: partial(self.inc, mode=AddressingMode.ZERO_PAGE_X),
             0xf8: self.sed,
+            0xfe: partial(self.inc, mode=AddressingMode.ABSOLUTE_X),
         }
 
     def step(self) -> StepResult:
@@ -439,6 +445,43 @@ class CPU6502:
     def dey(self) -> None:
         """Execute the DEcrement Y (DEY) instruction."""
         self.y = (self.y - 1) & 0xff
+
+        self.cycles += 2
+
+        self.update_zero_flag(self.y)
+        self.update_negative_flag(self.y)
+
+    def inc(self, mode: AddressingMode) -> None:
+        """Execute the INCrement (INC) instruction."""
+        addr, _ = self.resolve_address(mode)
+        byte = self.memory.read(addr)
+        byte = (byte + 1) & 0xff
+        self.memory.write(addr, byte)
+
+        # update cycle counter
+        cycle_counts = {
+            AddressingMode.ZERO_PAGE: 5,
+            AddressingMode.ZERO_PAGE_X: 6,
+            AddressingMode.ABSOLUTE: 6,
+            AddressingMode.ABSOLUTE_X: 7,
+        }
+        self.cycles += cycle_counts[mode]
+
+        self.update_zero_flag(byte)
+        self.update_negative_flag(byte)
+
+    def inx(self) -> None:
+        """Execute the INcrement X (INX) instruction."""
+        self.x = (self.x + 1) & 0xff
+
+        self.cycles += 2
+
+        self.update_zero_flag(self.x)
+        self.update_negative_flag(self.x)
+
+    def iny(self) -> None:
+        """Execute the INcrement Y (INY) instruction."""
+        self.y = (self.y + 1) & 0xff
 
         self.cycles += 2
 
