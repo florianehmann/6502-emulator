@@ -4,6 +4,7 @@ import enum
 import logging
 from collections.abc import Callable
 from functools import partial
+from typing import ClassVar
 
 from emulator.memory import Memory
 from emulator.utils import assert_never
@@ -44,6 +45,42 @@ class CPU6502:
     STATUS_N = 7
 
     STACK_ROOT = 0x0100
+
+    LOAD_CYCLE_COUNTS: ClassVar[dict[AddressingMode, int]] = {
+        AddressingMode.IMMEDIATE: 2,
+        AddressingMode.ZERO_PAGE: 3,
+        AddressingMode.ZERO_PAGE_X: 4,
+        AddressingMode.ZERO_PAGE_Y: 4,
+        AddressingMode.ABSOLUTE: 4,
+        AddressingMode.ABSOLUTE_X: 4,
+        AddressingMode.ABSOLUTE_Y: 4,
+        AddressingMode.INDIRECT_X: 6,
+        AddressingMode.INDIRECT_Y: 5,
+    }
+
+    LOAD_EXTRA_CYCLE_MODES: ClassVar[tuple[AddressingMode, ...]] = (
+        AddressingMode.ABSOLUTE_X,
+        AddressingMode.ABSOLUTE_Y,
+        AddressingMode.INDIRECT_Y,
+    )
+
+    STORE_CYCLE_COUNTS: ClassVar[dict[AddressingMode, int]] = {
+        AddressingMode.ZERO_PAGE: 3,
+        AddressingMode.ZERO_PAGE_X: 4,
+        AddressingMode.ZERO_PAGE_Y: 4,
+        AddressingMode.ABSOLUTE: 4,
+        AddressingMode.ABSOLUTE_X: 5,
+        AddressingMode.ABSOLUTE_Y: 5,
+        AddressingMode.INDIRECT_X: 6,
+        AddressingMode.INDIRECT_Y: 6,
+    }
+
+    UNARY_CYCLE_COUNTS: ClassVar[dict[AddressingMode, int]] = {
+        AddressingMode.ZERO_PAGE: 5,
+        AddressingMode.ZERO_PAGE_X: 6,
+        AddressingMode.ABSOLUTE: 6,
+        AddressingMode.ABSOLUTE_X: 7,
+    }
 
     def __init__(self, memory: Memory) -> None:
         """Initialize a CPU with memory."""
@@ -322,19 +359,8 @@ class CPU6502:
         self.a = self.memory.read(addr)
 
         # update cycle counter
-        cycle_counts = {
-            AddressingMode.IMMEDIATE: 2,
-            AddressingMode.ZERO_PAGE: 3,
-            AddressingMode.ZERO_PAGE_X: 4,
-            AddressingMode.ABSOLUTE: 4,
-            AddressingMode.ABSOLUTE_X: 4,
-            AddressingMode.ABSOLUTE_Y: 4,
-            AddressingMode.INDIRECT_X: 6,
-            AddressingMode.INDIRECT_Y: 5,
-        }
-        extra_cycle_page_boundary = [AddressingMode.ABSOLUTE_X, AddressingMode.ABSOLUTE_Y, AddressingMode.INDIRECT_Y]
-        self.cycles += cycle_counts[mode]
-        if page_boundary_crossed and mode in extra_cycle_page_boundary:
+        self.cycles += self.LOAD_CYCLE_COUNTS[mode]
+        if page_boundary_crossed and mode in self.LOAD_EXTRA_CYCLE_MODES:
             self.cycles += 1
 
         self.update_zero_flag(self.a)
@@ -347,16 +373,8 @@ class CPU6502:
         self.x = self.memory.read(addr)
 
         # update cycle counter
-        cycle_counts = {
-            AddressingMode.IMMEDIATE: 2,
-            AddressingMode.ZERO_PAGE: 3,
-            AddressingMode.ZERO_PAGE_Y: 4,
-            AddressingMode.ABSOLUTE: 4,
-            AddressingMode.ABSOLUTE_Y: 4,
-        }
-        extra_cycle_page_boundary = [AddressingMode.ABSOLUTE_Y]
-        self.cycles += cycle_counts[mode]
-        if page_boundary_crossed and mode in extra_cycle_page_boundary:
+        self.cycles += self.LOAD_CYCLE_COUNTS[mode]
+        if page_boundary_crossed and mode in self.LOAD_EXTRA_CYCLE_MODES:
             self.cycles += 1
 
         self.update_zero_flag(self.x)
@@ -369,16 +387,8 @@ class CPU6502:
         self.y = self.memory.read(addr)
 
         # update cycle counter
-        cycle_counts = {
-            AddressingMode.IMMEDIATE: 2,
-            AddressingMode.ZERO_PAGE: 3,
-            AddressingMode.ZERO_PAGE_X: 4,
-            AddressingMode.ABSOLUTE: 4,
-            AddressingMode.ABSOLUTE_X: 4,
-        }
-        extra_cycle_page_boundary = [AddressingMode.ABSOLUTE_X]
-        self.cycles += cycle_counts[mode]
-        if page_boundary_crossed and mode in extra_cycle_page_boundary:
+        self.cycles += self.LOAD_CYCLE_COUNTS[mode]
+        if page_boundary_crossed and mode in self.LOAD_EXTRA_CYCLE_MODES:
             self.cycles += 1
 
         self.update_zero_flag(self.y)
@@ -391,46 +401,21 @@ class CPU6502:
         # write register value to memory
         addr, _ = self.resolve_address(mode)
         self.memory.write(addr, self.a)
-
-        # update cycle counter
-        cycle_counts = {
-            AddressingMode.ZERO_PAGE: 3,
-            AddressingMode.ZERO_PAGE_X: 4,
-            AddressingMode.ABSOLUTE: 4,
-            AddressingMode.ABSOLUTE_X: 5,
-            AddressingMode.ABSOLUTE_Y: 5,
-            AddressingMode.INDIRECT_X: 6,
-            AddressingMode.INDIRECT_Y: 6,
-        }
-        self.cycles += cycle_counts[mode]
+        self.cycles += self.STORE_CYCLE_COUNTS[mode]
 
     def stx(self, mode: AddressingMode) -> None:
         """Execute the STore X (STX) instruction."""
         # write register value to memory
         addr, _ = self.resolve_address(mode)
         self.memory.write(addr, self.x)
-
-        # update cycle counter
-        cycle_counts = {
-            AddressingMode.ZERO_PAGE: 3,
-            AddressingMode.ZERO_PAGE_Y: 4,
-            AddressingMode.ABSOLUTE: 4,
-        }
-        self.cycles += cycle_counts[mode]
+        self.cycles += self.STORE_CYCLE_COUNTS[mode]
 
     def sty(self, mode: AddressingMode) -> None:
         """Execute the STore Y (STY) instruction."""
         # write register value to memory
         addr, _ = self.resolve_address(mode)
         self.memory.write(addr, self.y)
-
-        # update cycle counter
-        cycle_counts = {
-            AddressingMode.ZERO_PAGE: 3,
-            AddressingMode.ZERO_PAGE_X: 4,
-            AddressingMode.ABSOLUTE: 4,
-        }
-        self.cycles += cycle_counts[mode]
+        self.cycles += self.STORE_CYCLE_COUNTS[mode]
 
     # Unary arithmetic
 
@@ -441,14 +426,7 @@ class CPU6502:
         byte = (byte - 1) & 0xff
         self.memory.write(addr, byte)
 
-        # update cycle counter
-        cycle_counts = {
-            AddressingMode.ZERO_PAGE: 5,
-            AddressingMode.ZERO_PAGE_X: 6,
-            AddressingMode.ABSOLUTE: 6,
-            AddressingMode.ABSOLUTE_X: 7,
-        }
-        self.cycles += cycle_counts[mode]
+        self.cycles += self.UNARY_CYCLE_COUNTS[mode]
 
         self.update_zero_flag(byte)
         self.update_negative_flag(byte)
@@ -478,14 +456,7 @@ class CPU6502:
         byte = (byte + 1) & 0xff
         self.memory.write(addr, byte)
 
-        # update cycle counter
-        cycle_counts = {
-            AddressingMode.ZERO_PAGE: 5,
-            AddressingMode.ZERO_PAGE_X: 6,
-            AddressingMode.ABSOLUTE: 6,
-            AddressingMode.ABSOLUTE_X: 7,
-        }
-        self.cycles += cycle_counts[mode]
+        self.cycles += self.UNARY_CYCLE_COUNTS[mode]
 
         self.update_zero_flag(byte)
         self.update_negative_flag(byte)
@@ -534,13 +505,7 @@ class CPU6502:
         self.status &= ~(1 << self.STATUS_C)
         self.status |= (carry << self.STATUS_C)
 
-        cycle_counts = {
-            AddressingMode.ZERO_PAGE: 5,
-            AddressingMode.ZERO_PAGE_X: 6,
-            AddressingMode.ABSOLUTE: 6,
-            AddressingMode.ABSOLUTE_X: 7,
-        }
-        self.cycles += cycle_counts[mode] if mode else 2
+        self.cycles += self.UNARY_CYCLE_COUNTS[mode] if mode else 2
 
         self.update_zero_flag(value)
         self.update_negative_flag(value)
@@ -571,13 +536,7 @@ class CPU6502:
         self.status &= ~(1 << self.STATUS_C)
         self.status |= (carry << self.STATUS_C)
 
-        cycle_counts = {
-            AddressingMode.ZERO_PAGE: 5,
-            AddressingMode.ZERO_PAGE_X: 6,
-            AddressingMode.ABSOLUTE: 6,
-            AddressingMode.ABSOLUTE_X: 7,
-        }
-        self.cycles += cycle_counts[mode] if mode else 2
+        self.cycles += self.UNARY_CYCLE_COUNTS[mode] if mode else 2
 
         self.update_zero_flag(value)
         self.update_negative_flag(value)  # Always zero here
@@ -609,13 +568,7 @@ class CPU6502:
         self.status &= ~(1 << self.STATUS_C)
         self.status |= (carry << self.STATUS_C)
 
-        cycle_counts = {
-            AddressingMode.ZERO_PAGE: 5,
-            AddressingMode.ZERO_PAGE_X: 6,
-            AddressingMode.ABSOLUTE: 6,
-            AddressingMode.ABSOLUTE_X: 7,
-        }
-        self.cycles += cycle_counts[mode] if mode else 2
+        self.cycles += self.UNARY_CYCLE_COUNTS[mode] if mode else 2
 
         self.update_zero_flag(value)
         self.update_negative_flag(value)
@@ -647,13 +600,11 @@ class CPU6502:
         self.status &= ~(1 << self.STATUS_C)
         self.status |= (carry << self.STATUS_C)
 
-        cycle_counts = {
-            AddressingMode.ZERO_PAGE: 5,
-            AddressingMode.ZERO_PAGE_X: 6,
-            AddressingMode.ABSOLUTE: 6,
-            AddressingMode.ABSOLUTE_X: 7,
-        }
-        self.cycles += cycle_counts[mode] if mode else 2
+        self.cycles += self.UNARY_CYCLE_COUNTS[mode] if mode else 2
 
         self.update_zero_flag(value)
         self.update_negative_flag(value)
+
+        # Binary arithmetic (ADC, AND, EOR, ORA, SBC)
+
+        # Comparing instructions (BIT, CMP, CPX, CPY)
