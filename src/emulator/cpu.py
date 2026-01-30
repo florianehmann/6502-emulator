@@ -68,9 +68,19 @@ class CPU6502:
         """Return a map between opcode and method that contains the logic for the instruction."""
         return {
             0x00: self.brk,
+            0x06: partial(self.asl, mode=AddressingMode.ZERO_PAGE),
+            0x0a: partial(self.asl, mode=None),
+            0x0e: partial(self.asl, mode=AddressingMode.ABSOLUTE),
+            0x16: partial(self.asl, mode=AddressingMode.ZERO_PAGE_X),
             0x18: self.clc,
+            0x1e: partial(self.asl, mode=AddressingMode.ABSOLUTE_X),
             0x38: self.sec,
+            0x46: partial(self.lsr, mode=AddressingMode.ZERO_PAGE),
+            0x4a: partial(self.lsr, mode=None),
+            0x4e: partial(self.lsr, mode=AddressingMode.ABSOLUTE),
+            0x56: partial(self.lsr, mode=AddressingMode.ZERO_PAGE_X),
             0x58: self.cli,
+            0x5e: partial(self.lsr, mode=AddressingMode.ABSOLUTE_X),
             0x78: self.sei,
             0x81: partial(self.sta, mode=AddressingMode.INDIRECT_X),
             0x85: partial(self.sta, mode=AddressingMode.ZERO_PAGE),
@@ -487,3 +497,77 @@ class CPU6502:
 
         self.update_zero_flag(self.y)
         self.update_negative_flag(self.y)
+
+    def asl(self, mode: AddressingMode | None) -> None:
+        """Execute the Arithmetic Shift Left (ASL) instruction.
+
+        If `mode` is None, ASL is performed on the accumulator.
+        """
+        value: int
+        carry: int
+        if mode:
+            addr, _ = self.resolve_address(mode)
+            value = self.memory.read(addr)
+
+            carry = (value >> 7) & 1
+            value = (value << 1) & 0xff
+
+            self.memory.write(addr, value)
+        else:
+            value = self.a
+
+            carry = (value >> 7) & 1
+            value = (value << 1) & 0xff
+
+            self.a = value
+
+        self.status &= ~(1 << self.STATUS_C)
+        self.status |= (carry << self.STATUS_C)
+
+        cycle_counts = {
+            AddressingMode.ZERO_PAGE: 5,
+            AddressingMode.ZERO_PAGE_X: 6,
+            AddressingMode.ABSOLUTE: 6,
+            AddressingMode.ABSOLUTE_X: 7,
+        }
+        self.cycles += cycle_counts[mode] if mode else 2
+
+        self.update_zero_flag(value)
+        self.update_negative_flag(value)
+
+    def lsr(self, mode: AddressingMode | None) -> None:
+        """Execute the Logic Shift Right (LSR) instruction.
+
+        If `mode` is None, LSR is performed on the accumulator.
+        """
+        value: int
+        carry: int
+        if mode:
+            addr, _ = self.resolve_address(mode)
+            value = self.memory.read(addr)
+
+            carry = value & 1
+            value >>= 1
+
+            self.memory.write(addr, value)
+        else:
+            value = self.a
+
+            carry = value & 1
+            value >>= 1
+
+            self.a = value
+
+        self.status &= ~(1 << self.STATUS_C)
+        self.status |= (carry << self.STATUS_C)
+
+        cycle_counts = {
+            AddressingMode.ZERO_PAGE: 5,
+            AddressingMode.ZERO_PAGE_X: 6,
+            AddressingMode.ABSOLUTE: 6,
+            AddressingMode.ABSOLUTE_X: 7,
+        }
+        self.cycles += cycle_counts[mode] if mode else 2
+
+        self.update_zero_flag(value)
+        self.update_negative_flag(value)  # Always zero here
