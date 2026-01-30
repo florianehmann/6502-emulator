@@ -104,3 +104,42 @@ def test_lsr_accumulator(cpu: CPU6502, test_value: int, c: int, z: int):  # noqa
     assert (cpu.status >> CPU6502.STATUS_C) & 1 == c
     assert (cpu.status >> CPU6502.STATUS_Z) & 1 == z
     assert (cpu.status >> CPU6502.STATUS_N) & 1 == 0
+
+
+@pytest.mark.parametrize(("test_value", "result", "c_prev", "c", "z", "n"), [
+    (0x00, 0x00, 0, 0, 1, 0),  # lsb edge
+    (0x00, 0x01, 1, 0, 0, 0),
+    (0x80, 0x00, 0, 1, 1, 0),  # msb edge
+    (0x80, 0x01, 1, 1, 0, 0),  # both edges
+    (0xc0, 0x81, 1, 1, 0, 1),  # negative
+])
+def test_rol_accumulator(cpu: CPU6502, test_value: int, result: int, c_prev: int, c: int, z: int, n: int):  # noqa: D103, PLR0913
+    cpu.a = test_value
+    cpu.status &= ~(1 << CPU6502.STATUS_C)
+    cpu.status |= (c_prev << CPU6502.STATUS_C)
+    cpu.rol(None)
+
+    assert cpu.cycles == 2  # noqa: PLR2004
+    assert cpu.a == result
+    assert (cpu.status >> CPU6502.STATUS_C) & 1 == c
+    assert (cpu.status >> CPU6502.STATUS_Z) & 1 == z
+    assert (cpu.status >> CPU6502.STATUS_N) & 1 == n
+
+
+@pytest.mark.parametrize(("test_value", "result", "c_prev", "c", "z", "n"), [
+    (0x00, 0x00, 0, 0, 1, 0),  # lsb edge
+    (0x01, 0x00, 0, 1, 1, 0),
+    (0x00, 0x80, 1, 0, 0, 1),  # msb edge
+    (0x01, 0x80, 1, 1, 0, 1),  # both edges
+])
+def test_ror_accumulator(cpu: CPU6502, test_value: int, result: int, c_prev: int, c: int, z: int, n: int):  # noqa: D103, PLR0913
+    cpu.a = test_value
+    cpu.status &= ~(1 << CPU6502.STATUS_C)
+    cpu.status |= (c_prev << CPU6502.STATUS_C)
+    cpu.ror(None)
+
+    assert cpu.cycles == 2  # noqa: PLR2004
+    assert cpu.a == result
+    assert (cpu.status >> CPU6502.STATUS_C) & 1 == c
+    assert (cpu.status >> CPU6502.STATUS_Z) & 1 == z
+    assert (cpu.status >> CPU6502.STATUS_N) & 1 == n

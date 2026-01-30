@@ -74,14 +74,24 @@ class CPU6502:
             0x16: partial(self.asl, mode=AddressingMode.ZERO_PAGE_X),
             0x18: self.clc,
             0x1e: partial(self.asl, mode=AddressingMode.ABSOLUTE_X),
+            0x26: partial(self.rol, mode=AddressingMode.ZERO_PAGE),
+            0x2a: partial(self.rol, mode=None),
+            0x2e: partial(self.rol, mode=AddressingMode.ABSOLUTE),
+            0x36: partial(self.rol, mode=AddressingMode.ZERO_PAGE_X),
             0x38: self.sec,
+            0x3e: partial(self.rol, mode=AddressingMode.ABSOLUTE_X),
             0x46: partial(self.lsr, mode=AddressingMode.ZERO_PAGE),
             0x4a: partial(self.lsr, mode=None),
             0x4e: partial(self.lsr, mode=AddressingMode.ABSOLUTE),
             0x56: partial(self.lsr, mode=AddressingMode.ZERO_PAGE_X),
             0x58: self.cli,
             0x5e: partial(self.lsr, mode=AddressingMode.ABSOLUTE_X),
+            0x66: partial(self.ror, mode=AddressingMode.ZERO_PAGE),
+            0x6a: partial(self.ror, mode=None),
+            0x6e: partial(self.ror, mode=AddressingMode.ABSOLUTE),
+            0x76: partial(self.ror, mode=AddressingMode.ZERO_PAGE_X),
             0x78: self.sei,
+            0x7e: partial(self.ror, mode=AddressingMode.ABSOLUTE_X),
             0x81: partial(self.sta, mode=AddressingMode.INDIRECT_X),
             0x85: partial(self.sta, mode=AddressingMode.ZERO_PAGE),
             0x86: partial(self.stx, mode=AddressingMode.ZERO_PAGE),
@@ -571,3 +581,79 @@ class CPU6502:
 
         self.update_zero_flag(value)
         self.update_negative_flag(value)  # Always zero here
+
+    def rol(self, mode: AddressingMode | None) -> None:
+        """Execute the Rotate Left (ROL) instruction.
+
+        If `mode` is None, ROL is performed on the accumulator.
+        """
+        buffer = (self.status >> self.STATUS_C) & 1
+        value: int
+        carry: int
+        if mode:
+            addr, _ = self.resolve_address(mode)
+            value = self.memory.read(addr)
+
+            carry = (value >> 7) & 1
+            value = (value << 1 | buffer) & 0xff
+
+            self.memory.write(addr, value)
+        else:
+            value = self.a
+
+            carry = (value >> 7) & 1
+            value = (value << 1 | buffer) & 0xff
+
+            self.a = value
+
+        self.status &= ~(1 << self.STATUS_C)
+        self.status |= (carry << self.STATUS_C)
+
+        cycle_counts = {
+            AddressingMode.ZERO_PAGE: 5,
+            AddressingMode.ZERO_PAGE_X: 6,
+            AddressingMode.ABSOLUTE: 6,
+            AddressingMode.ABSOLUTE_X: 7,
+        }
+        self.cycles += cycle_counts[mode] if mode else 2
+
+        self.update_zero_flag(value)
+        self.update_negative_flag(value)
+
+    def ror(self, mode: AddressingMode | None) -> None:
+        """Execute the Rotate Right (ROR) instruction.
+
+        If `mode` is None, ROR is performed on the accumulator.
+        """
+        buffer = (self.status >> self.STATUS_C) & 1
+        value: int
+        carry: int
+        if mode:
+            addr, _ = self.resolve_address(mode)
+            value = self.memory.read(addr)
+
+            carry = value & 1
+            value = ((buffer << 8) | value) >> 1
+
+            self.memory.write(addr, value)
+        else:
+            value = self.a
+
+            carry = value & 1
+            value = ((buffer << 8) | value) >> 1
+
+            self.a = value
+
+        self.status &= ~(1 << self.STATUS_C)
+        self.status |= (carry << self.STATUS_C)
+
+        cycle_counts = {
+            AddressingMode.ZERO_PAGE: 5,
+            AddressingMode.ZERO_PAGE_X: 6,
+            AddressingMode.ABSOLUTE: 6,
+            AddressingMode.ABSOLUTE_X: 7,
+        }
+        self.cycles += cycle_counts[mode] if mode else 2
+
+        self.update_zero_flag(value)
+        self.update_negative_flag(value)
