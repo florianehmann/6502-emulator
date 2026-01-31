@@ -82,6 +82,24 @@ class CPU6502:
         AddressingMode.ABSOLUTE_X: 7,
     }
 
+    BINARY_CYCLE_COUNTS: ClassVar[dict[AddressingMode, int]] = {
+        AddressingMode.IMMEDIATE: 2,
+        AddressingMode.ZERO_PAGE: 3,
+        AddressingMode.ZERO_PAGE_X: 4,
+        AddressingMode.ZERO_PAGE_Y: 4,
+        AddressingMode.ABSOLUTE: 4,
+        AddressingMode.ABSOLUTE_X: 4,
+        AddressingMode.ABSOLUTE_Y: 4,
+        AddressingMode.INDIRECT_X: 6,
+        AddressingMode.INDIRECT_Y: 5,
+    }
+
+    BINARY_EXTRA_CYCLE_MODES: ClassVar[tuple[AddressingMode, ...]] = (
+        AddressingMode.ABSOLUTE_X,
+        AddressingMode.ABSOLUTE_Y,
+        # INDIRECT_Y only on some
+    )
+
     def __init__(self, memory: Memory) -> None:
         """Initialize a CPU with memory."""
         # Registers
@@ -605,6 +623,28 @@ class CPU6502:
         self.update_zero_flag(value)
         self.update_negative_flag(value)
 
-        # Binary arithmetic (ADC, AND, EOR, ORA, SBC)
+    # Binary arithmetic (ADC, AND, EOR, ORA, SBC)
 
-        # Comparing instructions (BIT, CMP, CPX, CPY)
+    def adc(self, mode: AddressingMode) -> None:
+        """Execute the ADd with Carry (ADC) instruction."""
+        addr, page_boundary_crossed = self.resolve_address(mode)
+        operand = self.memory.read(addr)
+
+        # TODO: Decimal mode
+
+        carry_in = (self.status >> self.STATUS_C) & 1
+        intermediate_sum = self.a + operand + carry_in
+        carry_out = intermediate_sum >> 8
+
+        self.a = intermediate_sum & 0xff
+        self.status &= ~(1 << self.STATUS_C)
+        self.status |= (carry_out << self.STATUS_C)
+        self.update_zero_flag(self.a)
+        self.update_negative_flag(self.a)
+        # TODO: Overflow Flag
+
+        self.cycles += self.BINARY_CYCLE_COUNTS[mode]
+        if page_boundary_crossed and mode in (*self.BINARY_EXTRA_CYCLE_MODES, AddressingMode.INDIRECT_Y):
+            self.cycles += 1
+
+    # Binary logic (BIT, CMP, CPX, CPY)
