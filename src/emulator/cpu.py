@@ -7,7 +7,7 @@ from functools import partial
 from typing import ClassVar
 
 from emulator.memory import Memory
-from emulator.utils import assert_never
+from emulator.utils import assert_never, dec_to_bcd
 
 logger = logging.getLogger(__name__)
 
@@ -141,11 +141,19 @@ class CPU6502:
             0x56: partial(self.lsr, mode=AddressingMode.ZERO_PAGE_X),
             0x58: self.cli,
             0x5e: partial(self.lsr, mode=AddressingMode.ABSOLUTE_X),
+            0x61: partial(self.adc, mode=AddressingMode.INDIRECT_X),
+            0x65: partial(self.adc, mode=AddressingMode.ZERO_PAGE),
             0x66: partial(self.ror, mode=AddressingMode.ZERO_PAGE),
+            0x69: partial(self.adc, mode=AddressingMode.IMMEDIATE),
             0x6a: partial(self.ror, mode=None),
+            0x6d: partial(self.adc, mode=AddressingMode.ABSOLUTE),
             0x6e: partial(self.ror, mode=AddressingMode.ABSOLUTE),
+            0x71: partial(self.adc, mode=AddressingMode.INDIRECT_Y),
+            0x75: partial(self.adc, mode=AddressingMode.ZERO_PAGE_X),
             0x76: partial(self.ror, mode=AddressingMode.ZERO_PAGE_X),
             0x78: self.sei,
+            0x79: partial(self.adc, mode=AddressingMode.ABSOLUTE_Y),
+            0x7d: partial(self.adc, mode=AddressingMode.ABSOLUTE_X),
             0x7e: partial(self.ror, mode=AddressingMode.ABSOLUTE_X),
             0x81: partial(self.sta, mode=AddressingMode.INDIRECT_X),
             0x85: partial(self.sta, mode=AddressingMode.ZERO_PAGE),
@@ -218,6 +226,23 @@ class CPU6502:
         """
         self.status &= ~(1 << self.STATUS_Z)
         self.status |= (result == 0) << self.STATUS_Z
+
+    def update_overflow_flag(self, a_initial: int, operand: int, result: int) -> None:
+        """Update the overflow (V) flag of the status register based on the result of an operation.
+
+        Args:
+            a_initial: Accumulator value before operation.
+            operand: Operand of potentially overflowing operation.
+            result: Accumulator value after operation.
+
+        """
+        inputs_same_sign = ~(a_initial ^ operand) & 0x80
+        result_sign_different_from_inputs = (a_initial ^ result) & 0x80
+        v = inputs_same_sign & result_sign_different_from_inputs
+        v = (v >> 7) & 1
+
+        self.status &= ~(1 << self.STATUS_V)
+        self.status |= v << self.STATUS_V
 
     def update_negative_flag(self, result: int) -> None:
         """Update the negative (N) flag of the status register based on the result of an operation.
@@ -630,18 +655,33 @@ class CPU6502:
         addr, page_boundary_crossed = self.resolve_address(mode)
         operand = self.memory.read(addr)
 
-        # TODO: Decimal mode
-
+        a_initial = self.a
         carry_in = (self.status >> self.STATUS_C) & 1
-        intermediate_sum = self.a + operand + carry_in
-        carry_out = intermediate_sum >> 8
+        binary_intermediate_sum = self.a + operand + carry_in
+        carry_out = binary_intermediate_sum >> 8
+        binary_result = binary_intermediate_sum & 0xff
 
-        self.a = intermediate_sum & 0xff
+        if (self.status & self.STATUS_D) == 0:
+            self.a = binary_result
+        else:
+            lo_nibble_a = a_initial & 0xF
+            hi_nibble_a = a_initial >> 4
+            lo_nibble_operand = operand & 0xF
+            hi_nibble_operand = operand >> 4
+
+            a_dec = lo_nibble_a + hi_nibble_a * 10
+            operand_dec = lo_nibble_operand + hi_nibble_operand * 10
+            intermediate_sum = a_dec + operand_dec + carry_in
+
+            carry_out = 1 if intermediate_sum >= 100 else 0  # noqa: PLR2004
+            intermediate_sum = intermediate_sum - 100 if carry_out else intermediate_sum
+            self.a = dec_to_bcd(intermediate_sum)
+
         self.status &= ~(1 << self.STATUS_C)
         self.status |= (carry_out << self.STATUS_C)
-        self.update_zero_flag(self.a)
-        self.update_negative_flag(self.a)
-        # TODO: Overflow Flag
+        self.update_zero_flag(binary_result)
+        self.update_negative_flag(binary_result)
+        self.update_overflow_flag(a_initial, operand, binary_result)
 
         self.cycles += self.BINARY_CYCLE_COUNTS[mode]
         if page_boundary_crossed and mode in (*self.BINARY_EXTRA_CYCLE_MODES, AddressingMode.INDIRECT_Y):
