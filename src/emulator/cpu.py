@@ -661,7 +661,7 @@ class CPU6502:
         carry_out = binary_intermediate_sum >> 8
         binary_result = binary_intermediate_sum & 0xff
 
-        if (self.status & self.STATUS_D) == 0:
+        if (self.status & (1 << self.STATUS_D)) == 0:
             self.a = binary_result
         else:
             lo_nibble_a = a_initial & 0xF
@@ -682,6 +682,43 @@ class CPU6502:
         self.update_zero_flag(binary_result)
         self.update_negative_flag(binary_result)
         self.update_overflow_flag(a_initial, operand, binary_result)
+
+        self.cycles += self.BINARY_CYCLE_COUNTS[mode]
+        if page_boundary_crossed and mode in (*self.BINARY_EXTRA_CYCLE_MODES, AddressingMode.INDIRECT_Y):
+            self.cycles += 1
+
+    def sbc(self, mode: AddressingMode) -> None:
+        """Execute the SuBtract with Carry / borrow (SBC) instruction."""
+        addr, page_boundary_crossed = self.resolve_address(mode)
+        operand = self.memory.read(addr)
+
+        a_initial = self.a
+        carry_in = (self.status >> self.STATUS_C) & 1
+        binary_intermediate_difference = self.a + (~operand & 0xff) + carry_in
+        carry_out = binary_intermediate_difference >> 8
+        binary_result = binary_intermediate_difference & 0xff
+
+        if (self.status & (1 << self.STATUS_D)) == 0:
+            self.a = binary_result
+        else:
+            lo_nibble_a = a_initial & 0xF
+            hi_nibble_a = a_initial >> 4
+            lo_nibble_operand = operand & 0xF
+            hi_nibble_operand = operand >> 4
+
+            a_dec = lo_nibble_a + hi_nibble_a * 10
+            operand_dec = lo_nibble_operand + hi_nibble_operand * 10
+            intermediate_sum = a_dec - operand_dec + carry_in - 1
+
+            carry_out = 1 if intermediate_sum >= 0 else 0
+            intermediate_sum = intermediate_sum if carry_out else intermediate_sum + 100
+            self.a = dec_to_bcd(intermediate_sum)
+
+        self.status &= ~(1 << self.STATUS_C)
+        self.status |= (carry_out << self.STATUS_C)
+        self.update_zero_flag(binary_result)
+        self.update_negative_flag(binary_result)
+        self.update_overflow_flag(a_initial, ~operand & 0xff, binary_result)
 
         self.cycles += self.BINARY_CYCLE_COUNTS[mode]
         if page_boundary_crossed and mode in (*self.BINARY_EXTRA_CYCLE_MODES, AddressingMode.INDIRECT_Y):
