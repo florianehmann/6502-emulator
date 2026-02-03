@@ -129,11 +129,19 @@ class CPU6502:
             0x16: partial(self.asl, mode=AddressingMode.ZERO_PAGE_X),
             0x18: self.clc,
             0x1e: partial(self.asl, mode=AddressingMode.ABSOLUTE_X),
+            0x21: partial(self.and_op, mode=AddressingMode.INDIRECT_X),
+            0x25: partial(self.and_op, mode=AddressingMode.ZERO_PAGE),
             0x26: partial(self.rol, mode=AddressingMode.ZERO_PAGE),
+            0x29: partial(self.and_op, mode=AddressingMode.IMMEDIATE),
             0x2a: partial(self.rol, mode=None),
+            0x2d: partial(self.and_op, mode=AddressingMode.ABSOLUTE),
             0x2e: partial(self.rol, mode=AddressingMode.ABSOLUTE),
+            0x31: partial(self.and_op, mode=AddressingMode.INDIRECT_Y),
+            0x35: partial(self.and_op, mode=AddressingMode.ZERO_PAGE_X),
             0x36: partial(self.rol, mode=AddressingMode.ZERO_PAGE_X),
             0x38: self.sec,
+            0x39: partial(self.and_op, mode=AddressingMode.ABSOLUTE_Y),
+            0x3d: partial(self.and_op, mode=AddressingMode.ABSOLUTE_X),
             0x3e: partial(self.rol, mode=AddressingMode.ABSOLUTE_X),
             0x46: partial(self.lsr, mode=AddressingMode.ZERO_PAGE),
             0x4a: partial(self.lsr, mode=None),
@@ -192,11 +200,19 @@ class CPU6502:
             0xd6: partial(self.dec, mode=AddressingMode.ZERO_PAGE_X),
             0xde: partial(self.dec, mode=AddressingMode.ABSOLUTE),
             0xd8: self.cld,
+            0xe1: partial(self.sbc, mode=AddressingMode.INDIRECT_X),
+            0xe5: partial(self.sbc, mode=AddressingMode.ZERO_PAGE),
             0xe6: partial(self.inc, mode=AddressingMode.ZERO_PAGE),
             0xe8: self.inx,
+            0xe9: partial(self.sbc, mode=AddressingMode.IMMEDIATE),
+            0xed: partial(self.sbc, mode=AddressingMode.ABSOLUTE),
             0xee: partial(self.inc, mode=AddressingMode.ABSOLUTE),
+            0xf1: partial(self.sbc, mode=AddressingMode.INDIRECT_Y),
+            0xf5: partial(self.sbc, mode=AddressingMode.ZERO_PAGE_X),
             0xf6: partial(self.inc, mode=AddressingMode.ZERO_PAGE_X),
             0xf8: self.sed,
+            0xf9: partial(self.sbc, mode=AddressingMode.ABSOLUTE_Y),
+            0xfd: partial(self.sbc, mode=AddressingMode.ABSOLUTE_X),
             0xfe: partial(self.inc, mode=AddressingMode.ABSOLUTE_X),
         }
 
@@ -685,6 +701,20 @@ class CPU6502:
 
         self.cycles += self.BINARY_CYCLE_COUNTS[mode]
         if page_boundary_crossed and mode in (*self.BINARY_EXTRA_CYCLE_MODES, AddressingMode.INDIRECT_Y):
+            self.cycles += 1
+
+    def and_op(self, mode: AddressingMode) -> None:
+        """Execute the AND instruction."""
+        addr, page_boundary_crossed = self.resolve_address(mode)
+        operand = self.memory.read(addr)
+
+        self.a &= operand
+
+        self.update_zero_flag(self.a)
+        self.update_negative_flag(self.a)
+
+        self.cycles += self.BINARY_CYCLE_COUNTS[mode]
+        if page_boundary_crossed and mode in self.BINARY_EXTRA_CYCLE_MODES:
             self.cycles += 1
 
     def sbc(self, mode: AddressingMode) -> None:
