@@ -15,3 +15,8 @@ def test_brk(cpu: CPU6502):  # noqa: D103
     assert cpu.pull_byte_from_stack() == 0x04  # noqa: PLR2004
     assert cpu.pull_byte_from_stack() == 0x02  # noqa: PLR2004
     assert cpu.cycles == 7  # noqa: PLR2004
+
+
+def test_nop(cpu: CPU6502):  # noqa: D103
+    cpu.nop()
+    assert cpu.cycles == 2  # noqa: PLR2004

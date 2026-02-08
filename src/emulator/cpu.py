@@ -230,6 +230,7 @@ class CPU6502:
             0xe6: partial(self.inc, mode=AddressingMode.ZERO_PAGE),
             0xe8: self.inx,
             0xe9: partial(self.sbc, mode=AddressingMode.IMMEDIATE),
+            0xea: self.nop,
             0xed: partial(self.sbc, mode=AddressingMode.ABSOLUTE),
             0xee: partial(self.inc, mode=AddressingMode.ABSOLUTE),
             0xf1: partial(self.sbc, mode=AddressingMode.INDIRECT_Y),
@@ -386,6 +387,8 @@ class CPU6502:
         self.sp = (self.sp + 1) & 0xff
         return self.memory.read(self.STACK_ROOT + self.sp)
 
+    # System instructions
+
     def brk(self) -> None:
         """Execute BRK instruction."""
         self.status |= (1 << self.STATUS_I) | (1 << self.STATUS_B)
@@ -396,6 +399,10 @@ class CPU6502:
         self.push_byte_to_stack(pc_hi)
         self.push_byte_to_stack(pc_lo)
         self.push_byte_to_stack(self.status)
+
+    def nop(self) -> None:
+        """Execute No OPeration (NOP) instruction."""
+        self.cycles += 2
 
     # Flag instructions
 
