@@ -106,6 +106,54 @@ def test_and_op(cpu: CPU6502, a_initial: int, operand: int, a: int, z: int, n: i
 
 
 @pytest.mark.parametrize(
+    ("a_initial", "operand", "a", "z", "n"),
+    [
+        (0x00, 0x00, 0x00, 1, 0),
+        (0xff, 0x0f, 0xf0, 0, 1),
+        (0xff, 0xf0, 0x0f, 0, 0),
+    ],
+    ids=[
+        "0x00 & 0x00 = 0, Smoke test",
+        "0xff & 0x0f = 0xf0",
+        "0xff & 0xf0 = 0x0f",
+    ],
+)
+def test_eor(cpu: CPU6502, a_initial: int, operand: int, a: int, z: int, n: int):  # noqa: D103, PLR0913
+    cpu.a = a_initial
+    cpu.memory.write(0, operand)
+    cpu.eor(AddressingMode.IMMEDIATE)
+
+    assert cpu.a == a
+    assert (cpu.status >> CPU6502.STATUS_Z) & 1 == z
+    assert (cpu.status >> CPU6502.STATUS_N) & 1 == n
+    assert cpu.cycles == 2  # noqa: PLR2004
+
+
+@pytest.mark.parametrize(
+    ("a_initial", "operand", "a", "z", "n"),
+    [
+        (0x00, 0x00, 0x00, 1, 0),
+        (0x00, 0x0f, 0x0f, 0, 0),
+        (0x00, 0xf0, 0xf0, 0, 1),
+    ],
+    ids=[
+        "0x00 | 0x00 = 0, Smoke test",
+        "0x00 | 0x0f = 0x0f",
+        "0x00 | 0xf0 = 0xf0",
+    ],
+)
+def test_ora(cpu: CPU6502, a_initial: int, operand: int, a: int, z: int, n: int):  # noqa: D103, PLR0913
+    cpu.a = a_initial
+    cpu.memory.write(0, operand)
+    cpu.ora(AddressingMode.IMMEDIATE)
+
+    assert cpu.a == a
+    assert (cpu.status >> CPU6502.STATUS_Z) & 1 == z
+    assert (cpu.status >> CPU6502.STATUS_N) & 1 == n
+    assert cpu.cycles == 2  # noqa: PLR2004
+
+
+@pytest.mark.parametrize(
     ("a_initial", "operand", "c_in", "a", "c", "v", "z", "n"),
     [
         (0x00, 0x00, 1, 0x00, 1, 0, 1, 0),

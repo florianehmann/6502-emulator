@@ -123,11 +123,19 @@ class CPU6502:
         """Return a map between opcode and method that contains the logic for the instruction."""
         return {
             0x00: self.brk,
+            0x01: partial(self.ora, mode=AddressingMode.INDIRECT_X),
+            0x05: partial(self.ora, mode=AddressingMode.ZERO_PAGE),
             0x06: partial(self.asl, mode=AddressingMode.ZERO_PAGE),
+            0x09: partial(self.ora, mode=AddressingMode.IMMEDIATE),
             0x0a: partial(self.asl, mode=None),
+            0x0d: partial(self.ora, mode=AddressingMode.ABSOLUTE),
             0x0e: partial(self.asl, mode=AddressingMode.ABSOLUTE),
+            0x11: partial(self.ora, mode=AddressingMode.INDIRECT_Y),
+            0x15: partial(self.ora, mode=AddressingMode.ZERO_PAGE_X),
             0x16: partial(self.asl, mode=AddressingMode.ZERO_PAGE_X),
             0x18: self.clc,
+            0x19: partial(self.ora, mode=AddressingMode.ABSOLUTE_Y),
+            0x1d: partial(self.ora, mode=AddressingMode.ABSOLUTE_X),
             0x1e: partial(self.asl, mode=AddressingMode.ABSOLUTE_X),
             0x21: partial(self.and_op, mode=AddressingMode.INDIRECT_X),
             0x25: partial(self.and_op, mode=AddressingMode.ZERO_PAGE),
@@ -143,11 +151,19 @@ class CPU6502:
             0x39: partial(self.and_op, mode=AddressingMode.ABSOLUTE_Y),
             0x3d: partial(self.and_op, mode=AddressingMode.ABSOLUTE_X),
             0x3e: partial(self.rol, mode=AddressingMode.ABSOLUTE_X),
+            0x41: partial(self.eor, mode=AddressingMode.INDIRECT_X),
+            0x45: partial(self.eor, mode=AddressingMode.ZERO_PAGE),
             0x46: partial(self.lsr, mode=AddressingMode.ZERO_PAGE),
+            0x49: partial(self.eor, mode=AddressingMode.IMMEDIATE),
             0x4a: partial(self.lsr, mode=None),
+            0x4d: partial(self.eor, mode=AddressingMode.ABSOLUTE),
             0x4e: partial(self.lsr, mode=AddressingMode.ABSOLUTE),
+            0x51: partial(self.eor, mode=AddressingMode.INDIRECT_Y),
+            0x55: partial(self.eor, mode=AddressingMode.ZERO_PAGE_X),
             0x56: partial(self.lsr, mode=AddressingMode.ZERO_PAGE_X),
             0x58: self.cli,
+            0x59: partial(self.eor, mode=AddressingMode.ABSOLUTE_Y),
+            0x5d: partial(self.eor, mode=AddressingMode.ABSOLUTE_X),
             0x5e: partial(self.lsr, mode=AddressingMode.ABSOLUTE_X),
             0x61: partial(self.adc, mode=AddressingMode.INDIRECT_X),
             0x65: partial(self.adc, mode=AddressingMode.ZERO_PAGE),
@@ -709,6 +725,34 @@ class CPU6502:
         operand = self.memory.read(addr)
 
         self.a &= operand
+
+        self.update_zero_flag(self.a)
+        self.update_negative_flag(self.a)
+
+        self.cycles += self.BINARY_CYCLE_COUNTS[mode]
+        if page_boundary_crossed and mode in (*self.BINARY_EXTRA_CYCLE_MODES, AddressingMode.INDIRECT_Y):
+            self.cycles += 1
+
+    def eor(self, mode: AddressingMode) -> None:
+        """Execute the Exclusive OR instruction."""
+        addr, page_boundary_crossed = self.resolve_address(mode)
+        operand = self.memory.read(addr)
+
+        self.a ^= operand
+
+        self.update_zero_flag(self.a)
+        self.update_negative_flag(self.a)
+
+        self.cycles += self.BINARY_CYCLE_COUNTS[mode]
+        if page_boundary_crossed and mode in self.BINARY_EXTRA_CYCLE_MODES:
+            self.cycles += 1
+
+    def ora(self, mode: AddressingMode) -> None:
+        """Execute the OR with Accumulator instruction."""
+        addr, page_boundary_crossed = self.resolve_address(mode)
+        operand = self.memory.read(addr)
+
+        self.a |= operand
 
         self.update_zero_flag(self.a)
         self.update_negative_flag(self.a)
