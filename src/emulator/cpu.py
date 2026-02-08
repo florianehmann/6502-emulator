@@ -183,12 +183,15 @@ class CPU6502:
             0x85: partial(self.sta, mode=AddressingMode.ZERO_PAGE),
             0x86: partial(self.stx, mode=AddressingMode.ZERO_PAGE),
             0x88: self.dey,
+            0x8a: self.txa,
             0x8d: partial(self.sta, mode=AddressingMode.ABSOLUTE),
             0x8e: partial(self.stx, mode=AddressingMode.ABSOLUTE),
             0x91: partial(self.sta, mode=AddressingMode.INDIRECT_Y),
             0x95: partial(self.sta, mode=AddressingMode.ZERO_PAGE_X),
             0x96: partial(self.stx, mode=AddressingMode.ZERO_PAGE_Y),
+            0x98: self.tya,
             0x99: partial(self.sta, mode=AddressingMode.ABSOLUTE_Y),
+            0x9a: self.txs,
             0x9d: partial(self.sta, mode=AddressingMode.ABSOLUTE_X),
             0xa0: partial(self.ldy, mode=AddressingMode.IMMEDIATE),
             0xa1: partial(self.lda, mode=AddressingMode.INDIRECT_X),
@@ -196,7 +199,9 @@ class CPU6502:
             0xa4: partial(self.ldy, mode=AddressingMode.ZERO_PAGE),
             0xa5: partial(self.lda, mode=AddressingMode.ZERO_PAGE),
             0xa6: partial(self.ldx, mode=AddressingMode.ZERO_PAGE),
+            0xa8: self.tay,
             0xa9: partial(self.lda, mode=AddressingMode.IMMEDIATE),
+            0xaa: self.tax,
             0xac: partial(self.ldy, mode=AddressingMode.ABSOLUTE),
             0xad: partial(self.lda, mode=AddressingMode.ABSOLUTE),
             0xae: partial(self.ldx, mode=AddressingMode.ABSOLUTE),
@@ -206,6 +211,7 @@ class CPU6502:
             0xb6: partial(self.ldx, mode=AddressingMode.ZERO_PAGE_Y),
             0xb8: self.clv,
             0xb9: partial(self.lda, mode=AddressingMode.ABSOLUTE_Y),
+            0xba: self.tsx,
             0xbc: partial(self.ldy, mode=AddressingMode.ABSOLUTE_X),
             0xbd: partial(self.lda, mode=AddressingMode.ABSOLUTE_X),
             0xbe: partial(self.ldx, mode=AddressingMode.ABSOLUTE_Y),
@@ -491,6 +497,48 @@ class CPU6502:
         addr, _ = self.resolve_address(mode)
         self.memory.write(addr, self.y)
         self.cycles += self.STORE_CYCLE_COUNTS[mode]
+
+    # Register transfer
+
+    def tax(self) -> None:
+        """Execute the Transfer Accumulator to X (TAX) instruction."""
+        self.x = self.a
+        self.cycles += 2
+        self.update_zero_flag(self.x)
+        self.update_negative_flag(self.x)
+
+    def tay(self) -> None:
+        """Execute the Transfer Accumulator to Y (TAY) instruction."""
+        self.y = self.a
+        self.cycles += 2
+        self.update_zero_flag(self.y)
+        self.update_negative_flag(self.y)
+
+    def tsx(self) -> None:
+        """Execute the Transfer Stack Pointer to X (TSX) instruction."""
+        self.x = self.sp
+        self.cycles += 2
+        self.update_zero_flag(self.x)
+        self.update_negative_flag(self.x)
+
+    def txa(self) -> None:
+        """Execute the Transfer X to Accumulator (TXA) instruction."""
+        self.a = self.x
+        self.cycles += 2
+        self.update_zero_flag(self.a)
+        self.update_negative_flag(self.a)
+
+    def txs(self) -> None:
+        """Execute the Transfer X to Stack Pointer (TXS) instruction."""
+        self.sp = self.x
+        self.cycles += 2
+
+    def tya(self) -> None:
+        """Execute the Transfer Y to Accumulator (TYA) instruction."""
+        self.a = self.y
+        self.cycles += 2
+        self.update_zero_flag(self.a)
+        self.update_negative_flag(self.a)
 
     # Unary arithmetic
 
