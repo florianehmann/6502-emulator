@@ -381,7 +381,7 @@ class CPU6502:
         Note: This method does not update the status register or perform overflow checks.
 
         Returns:
-            byte: Byte to push onto the stack.
+            byte: Byte pulled from the stack.
 
         """
         self.sp = (self.sp + 1) & 0xff
