@@ -31,7 +31,7 @@ def test_minimal_program(cpu: CPU6502):
     assert cpu.memory.read(0x0201) == 5  # noqa: PLR2004
     assert cpu.cycles == 19  # noqa: PLR2004
 
-@pytest.mark.xfail
+
 def test_loop_program(cpu: CPU6502):
     """Test looping."""
     cpu.memory.write_bytes_hex(0x300,
@@ -53,7 +53,7 @@ def test_loop_program(cpu: CPU6502):
         if result == StepResult.BRK:
             break
 
-        if steps > 10:  # noqa: PLR2004
+        if steps > 300:  # noqa: PLR2004
             pytest.fail("Program didn't halt.")
 
     assert cpu.cycles == 59  # noqa: PLR2004

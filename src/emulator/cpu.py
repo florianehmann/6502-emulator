@@ -130,6 +130,7 @@ class CPU6502:
             0x0a: partial(self.asl, mode=None),
             0x0d: partial(self.ora, mode=AddressingMode.ABSOLUTE),
             0x0e: partial(self.asl, mode=AddressingMode.ABSOLUTE),
+            0x10: partial(self.branch, flag_index=self.STATUS_N, flag_value=0),
             0x11: partial(self.ora, mode=AddressingMode.INDIRECT_Y),
             0x15: partial(self.ora, mode=AddressingMode.ZERO_PAGE_X),
             0x16: partial(self.asl, mode=AddressingMode.ZERO_PAGE_X),
@@ -144,6 +145,7 @@ class CPU6502:
             0x2a: partial(self.rol, mode=None),
             0x2d: partial(self.and_op, mode=AddressingMode.ABSOLUTE),
             0x2e: partial(self.rol, mode=AddressingMode.ABSOLUTE),
+            0x30: partial(self.branch, flag_index=self.STATUS_N, flag_value=1),
             0x31: partial(self.and_op, mode=AddressingMode.INDIRECT_Y),
             0x35: partial(self.and_op, mode=AddressingMode.ZERO_PAGE_X),
             0x36: partial(self.rol, mode=AddressingMode.ZERO_PAGE_X),
@@ -159,6 +161,7 @@ class CPU6502:
             0x4c: partial(self.jmp, mode="absolute"),
             0x4d: partial(self.eor, mode=AddressingMode.ABSOLUTE),
             0x4e: partial(self.lsr, mode=AddressingMode.ABSOLUTE),
+            0x50: partial(self.branch, flag_index=self.STATUS_V, flag_value=0),
             0x51: partial(self.eor, mode=AddressingMode.INDIRECT_Y),
             0x55: partial(self.eor, mode=AddressingMode.ZERO_PAGE_X),
             0x56: partial(self.lsr, mode=AddressingMode.ZERO_PAGE_X),
@@ -174,6 +177,7 @@ class CPU6502:
             0x6c: partial(self.jmp, mode="indirect"),
             0x6d: partial(self.adc, mode=AddressingMode.ABSOLUTE),
             0x6e: partial(self.ror, mode=AddressingMode.ABSOLUTE),
+            0x70: partial(self.branch, flag_index=self.STATUS_V, flag_value=1),
             0x71: partial(self.adc, mode=AddressingMode.INDIRECT_Y),
             0x75: partial(self.adc, mode=AddressingMode.ZERO_PAGE_X),
             0x76: partial(self.ror, mode=AddressingMode.ZERO_PAGE_X),
@@ -190,6 +194,7 @@ class CPU6502:
             0x8c: partial(self.sty, mode=AddressingMode.ABSOLUTE),
             0x8d: partial(self.sta, mode=AddressingMode.ABSOLUTE),
             0x8e: partial(self.stx, mode=AddressingMode.ABSOLUTE),
+            0x90: partial(self.branch, flag_index=self.STATUS_C, flag_value=0),
             0x91: partial(self.sta, mode=AddressingMode.INDIRECT_Y),
             0x94: partial(self.sty, mode=AddressingMode.ZERO_PAGE_X),
             0x95: partial(self.sta, mode=AddressingMode.ZERO_PAGE_X),
@@ -210,6 +215,7 @@ class CPU6502:
             0xac: partial(self.ldy, mode=AddressingMode.ABSOLUTE),
             0xad: partial(self.lda, mode=AddressingMode.ABSOLUTE),
             0xae: partial(self.ldx, mode=AddressingMode.ABSOLUTE),
+            0xb0: partial(self.branch, flag_index=self.STATUS_C, flag_value=1),
             0xb1: partial(self.lda, mode=AddressingMode.INDIRECT_Y),
             0xb4: partial(self.ldy, mode=AddressingMode.ZERO_PAGE_X),
             0xb5: partial(self.lda, mode=AddressingMode.ZERO_PAGE_X),
@@ -224,6 +230,7 @@ class CPU6502:
             0xc8: self.iny,
             0xca: self.dex,
             0xce: partial(self.dec, mode=AddressingMode.ABSOLUTE),
+            0xd0: partial(self.branch, flag_index=self.STATUS_Z, flag_value=0),
             0xd6: partial(self.dec, mode=AddressingMode.ZERO_PAGE_X),
             0xde: partial(self.dec, mode=AddressingMode.ABSOLUTE),
             0xd8: self.cld,
@@ -235,6 +242,7 @@ class CPU6502:
             0xea: self.nop,
             0xed: partial(self.sbc, mode=AddressingMode.ABSOLUTE),
             0xee: partial(self.inc, mode=AddressingMode.ABSOLUTE),
+            0xf0: partial(self.branch, flag_index=self.STATUS_Z, flag_value=1),
             0xf1: partial(self.sbc, mode=AddressingMode.INDIRECT_Y),
             0xf5: partial(self.sbc, mode=AddressingMode.ZERO_PAGE_X),
             0xf6: partial(self.inc, mode=AddressingMode.ZERO_PAGE_X),
@@ -388,6 +396,36 @@ class CPU6502:
         """
         self.sp = (self.sp + 1) & 0xff
         return self.memory.read(self.STACK_ROOT + self.sp)
+
+    def branch(self, flag_index: int, flag_value: int) -> None:
+        """Branch to relative address if specified flag is set or clear.
+
+        Args:
+            flag_index: Index of the flag in the status register to check.
+            flag_value: The value the flag should have for the branch to be taken (0 or 1).
+
+        """
+        int8_min = 0x80
+        should_branch = ((self.status >> flag_index) & 1) == flag_value
+        if should_branch:
+            offset = self.memory.read(self.pc)
+            self.pc += 1
+
+            # convert negative offsets to signed values
+            if offset >= int8_min:
+                offset -= 0x100
+
+            # jump
+            old_pc = self.pc
+            self.pc = (self.pc + offset) & 0xffff
+            self.cycles += 3
+
+            # add another cycle if page boundary is crossed
+            if (old_pc & 0xff00) != (self.pc & 0xff00):
+                self.cycles += 1
+        else:
+            self.pc += 1
+            self.cycles += 2
 
     # System instructions
 
