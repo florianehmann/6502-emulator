@@ -4,7 +4,7 @@ import enum
 import logging
 from collections.abc import Callable
 from functools import partial
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from emulator.memory import Memory
 from emulator.utils import assert_never, dec_to_bcd
@@ -156,6 +156,7 @@ class CPU6502:
             0x46: partial(self.lsr, mode=AddressingMode.ZERO_PAGE),
             0x49: partial(self.eor, mode=AddressingMode.IMMEDIATE),
             0x4a: partial(self.lsr, mode=None),
+            0x4c: partial(self.jmp, mode="absolute"),
             0x4d: partial(self.eor, mode=AddressingMode.ABSOLUTE),
             0x4e: partial(self.lsr, mode=AddressingMode.ABSOLUTE),
             0x51: partial(self.eor, mode=AddressingMode.INDIRECT_Y),
@@ -170,6 +171,7 @@ class CPU6502:
             0x66: partial(self.ror, mode=AddressingMode.ZERO_PAGE),
             0x69: partial(self.adc, mode=AddressingMode.IMMEDIATE),
             0x6a: partial(self.ror, mode=None),
+            0x6c: partial(self.jmp, mode="indirect"),
             0x6d: partial(self.adc, mode=AddressingMode.ABSOLUTE),
             0x6e: partial(self.ror, mode=AddressingMode.ABSOLUTE),
             0x71: partial(self.adc, mode=AddressingMode.INDIRECT_Y),
@@ -390,7 +392,7 @@ class CPU6502:
     # System instructions
 
     def brk(self) -> None:
-        """Execute BRK instruction."""
+        """Execute the BReaK (BRK) instruction."""
         self.status |= (1 << self.STATUS_I) | (1 << self.STATUS_B)
         self.pc += 1
         self.cycles += 7
@@ -399,6 +401,25 @@ class CPU6502:
         self.push_byte_to_stack(pc_hi)
         self.push_byte_to_stack(pc_lo)
         self.push_byte_to_stack(self.status)
+
+    def jmp(self, mode: Literal["absolute", "indirect"]) -> None:
+        """Execute the JuMP (JMP) instruction.
+
+        Note: This implementation correctly reproduces the hardware bug of the original NMOS 6502 in which the high byte
+        of the target address is fetched from the beginning of the same page when the low byte is 0xff.
+        """
+        addr_lo = self.memory.read(self.pc)
+        addr_hi = self.memory.read((self.pc + 1) & 0xffff)
+        addr = (addr_hi << 8) | addr_lo
+        if mode == "absolute":
+            self.pc = addr
+        elif mode == "indirect":
+            addr_lo = self.memory.read(addr)
+            # this reproduces the NMOS 6502's hardware bug
+            addr_incremented = (addr & 0xff00) | ((addr + 1) & 0x00ff)
+            addr_hi = self.memory.read(addr_incremented)
+            self.pc = (addr_hi << 8) | addr_lo
+        self.cycles += 3 if mode == "absolute" else 5
 
     def nop(self) -> None:
         """Execute No OPeration (NOP) instruction."""

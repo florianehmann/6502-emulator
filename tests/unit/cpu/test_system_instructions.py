@@ -17,6 +17,31 @@ def test_brk(cpu: CPU6502):  # noqa: D103
     assert cpu.cycles == 7  # noqa: PLR2004
 
 
+def test_jmp_absolute(cpu: CPU6502):  # noqa: D103
+    cpu.memory.write_bytes_hex(0, "00 04")
+    cpu.jmp(mode="absolute")
+    assert cpu.pc == 0x0400  # noqa: PLR2004
+    assert cpu.cycles == 3  # noqa: PLR2004
+
+
+def test_jmp_indirect(cpu: CPU6502):  # noqa: D103
+    cpu.memory.write_bytes_hex(0, "00 01")
+    cpu.memory.write_bytes_hex(0x0100, "00 02")
+    cpu.jmp(mode="indirect")
+    assert cpu.pc == 0x0200  # noqa: PLR2004
+    assert cpu.cycles == 5  # noqa: PLR2004
+
+
+def test_jmp_indirect_page_boundary_bug(cpu: CPU6502):
+    """Test if the page boundary bug of the original NMOS 6502 is correctly reproduced."""
+    cpu.memory.write_bytes_hex(0, "ff 01")
+    cpu.memory.write_bytes_hex(0x01ff, "00")
+    cpu.memory.write_bytes_hex(0x0100, "02")
+    cpu.jmp(mode="indirect")
+    assert cpu.pc == 0x0200  # noqa: PLR2004
+    assert cpu.cycles == 5  # noqa: PLR2004
+
+
 def test_nop(cpu: CPU6502):  # noqa: D103
     cpu.nop()
     assert cpu.cycles == 2  # noqa: PLR2004
