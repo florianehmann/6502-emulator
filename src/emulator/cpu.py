@@ -139,10 +139,12 @@ class CPU6502:
             0x1d: partial(self.ora, mode=AddressingMode.ABSOLUTE_X),
             0x1e: partial(self.asl, mode=AddressingMode.ABSOLUTE_X),
             0x21: partial(self.and_op, mode=AddressingMode.INDIRECT_X),
+            0x24: partial(self.bit, mode=AddressingMode.ZERO_PAGE),
             0x25: partial(self.and_op, mode=AddressingMode.ZERO_PAGE),
             0x26: partial(self.rol, mode=AddressingMode.ZERO_PAGE),
             0x29: partial(self.and_op, mode=AddressingMode.IMMEDIATE),
             0x2a: partial(self.rol, mode=None),
+            0x2c: partial(self.bit, mode=AddressingMode.ABSOLUTE),
             0x2d: partial(self.and_op, mode=AddressingMode.ABSOLUTE),
             0x2e: partial(self.rol, mode=AddressingMode.ABSOLUTE),
             0x30: partial(self.branch, flag_index=self.STATUS_N, flag_value=1),
@@ -915,4 +917,22 @@ class CPU6502:
         if page_boundary_crossed and mode in (*self.BINARY_EXTRA_CYCLE_MODES, AddressingMode.INDIRECT_Y):
             self.cycles += 1
 
-    # Binary logic (BIT, CMP, CPX, CPY)
+    # Binary logic
+
+    def bit(self, mode: AddressingMode) -> None:
+        """Execute the BIT test (BIT) instruction."""
+        addr, _ = self.resolve_address(mode)
+        operand = self.memory.read(addr)
+
+        operand_bit_7 = (operand >> 7) & 1
+        operand_bit_6 = (operand >> 6) & 1
+        operand_mask_zero = 1 if operand & self.a == 0 else 0
+
+        self.status &= ~(1 << self.STATUS_N)
+        self.status &= ~(1 << self.STATUS_V)
+        self.status &= ~(1 << self.STATUS_Z)
+        self.status |= (operand_bit_7 << self.STATUS_N)
+        self.status |= (operand_bit_6 << self.STATUS_V)
+        self.status |= (operand_mask_zero << self.STATUS_Z)
+
+        self.cycles += self.BINARY_CYCLE_COUNTS[mode]
