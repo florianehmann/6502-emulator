@@ -4,7 +4,7 @@ import enum
 import logging
 from collections.abc import Callable
 from functools import partial
-from typing import ClassVar, Literal
+from typing import Any, ClassVar, Literal, Protocol, cast, runtime_checkable
 
 from emulator.memory import Memory
 from emulator.utils import assert_never, dec_to_bcd
@@ -31,6 +31,29 @@ class StepResult(enum.Enum):
 
     NORMAL = enum.auto()
     BRK = enum.auto()
+
+
+@runtime_checkable
+class OpcodeFunction(Protocol):
+    """A callable with generic arguments that carries an `opcode` attribute."""
+
+    opcodes: list[tuple[int, dict[str, Any]]]
+    def __call__(self, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401, D102
+        ...
+
+
+def opcode(opcode: int, **kwargs: Any) -> Callable[..., OpcodeFunction]:  # noqa: ANN401
+    """Register a set of arguments to an opcode."""
+    def decorator(func: Callable[..., None]) -> OpcodeFunction:
+        func = cast("OpcodeFunction", func)
+        if not hasattr(func, "opcodes"):
+            func.opcodes = []
+        if opcode in (op for op, _ in func.opcodes):
+            msg = f"Opcode 0x{opcode:02x} has already been registered for this function."
+            raise ValueError(msg)
+        func.opcodes.append((opcode, kwargs))
+        return func
+    return decorator
 
 
 class CPU6502:
@@ -121,138 +144,21 @@ class CPU6502:
 
     def build_opcode_table(self) -> dict[int, Callable[[], None]]:
         """Return a map between opcode and method that contains the logic for the instruction."""
-        return {
-            0x00: self.brk,
-            0x01: partial(self.ora, mode=AddressingMode.INDIRECT_X),
-            0x05: partial(self.ora, mode=AddressingMode.ZERO_PAGE),
-            0x06: partial(self.asl, mode=AddressingMode.ZERO_PAGE),
-            0x09: partial(self.ora, mode=AddressingMode.IMMEDIATE),
-            0x0a: partial(self.asl, mode=None),
-            0x0d: partial(self.ora, mode=AddressingMode.ABSOLUTE),
-            0x0e: partial(self.asl, mode=AddressingMode.ABSOLUTE),
-            0x10: partial(self.branch, flag_index=self.STATUS_N, flag_value=0),
-            0x11: partial(self.ora, mode=AddressingMode.INDIRECT_Y),
-            0x15: partial(self.ora, mode=AddressingMode.ZERO_PAGE_X),
-            0x16: partial(self.asl, mode=AddressingMode.ZERO_PAGE_X),
-            0x18: self.clc,
-            0x19: partial(self.ora, mode=AddressingMode.ABSOLUTE_Y),
-            0x1d: partial(self.ora, mode=AddressingMode.ABSOLUTE_X),
-            0x1e: partial(self.asl, mode=AddressingMode.ABSOLUTE_X),
-            0x21: partial(self.and_op, mode=AddressingMode.INDIRECT_X),
-            0x24: partial(self.bit, mode=AddressingMode.ZERO_PAGE),
-            0x25: partial(self.and_op, mode=AddressingMode.ZERO_PAGE),
-            0x26: partial(self.rol, mode=AddressingMode.ZERO_PAGE),
-            0x29: partial(self.and_op, mode=AddressingMode.IMMEDIATE),
-            0x2a: partial(self.rol, mode=None),
-            0x2c: partial(self.bit, mode=AddressingMode.ABSOLUTE),
-            0x2d: partial(self.and_op, mode=AddressingMode.ABSOLUTE),
-            0x2e: partial(self.rol, mode=AddressingMode.ABSOLUTE),
-            0x30: partial(self.branch, flag_index=self.STATUS_N, flag_value=1),
-            0x31: partial(self.and_op, mode=AddressingMode.INDIRECT_Y),
-            0x35: partial(self.and_op, mode=AddressingMode.ZERO_PAGE_X),
-            0x36: partial(self.rol, mode=AddressingMode.ZERO_PAGE_X),
-            0x38: self.sec,
-            0x39: partial(self.and_op, mode=AddressingMode.ABSOLUTE_Y),
-            0x3d: partial(self.and_op, mode=AddressingMode.ABSOLUTE_X),
-            0x3e: partial(self.rol, mode=AddressingMode.ABSOLUTE_X),
-            0x41: partial(self.eor, mode=AddressingMode.INDIRECT_X),
-            0x45: partial(self.eor, mode=AddressingMode.ZERO_PAGE),
-            0x46: partial(self.lsr, mode=AddressingMode.ZERO_PAGE),
-            0x49: partial(self.eor, mode=AddressingMode.IMMEDIATE),
-            0x4a: partial(self.lsr, mode=None),
-            0x4c: partial(self.jmp, mode="absolute"),
-            0x4d: partial(self.eor, mode=AddressingMode.ABSOLUTE),
-            0x4e: partial(self.lsr, mode=AddressingMode.ABSOLUTE),
-            0x50: partial(self.branch, flag_index=self.STATUS_V, flag_value=0),
-            0x51: partial(self.eor, mode=AddressingMode.INDIRECT_Y),
-            0x55: partial(self.eor, mode=AddressingMode.ZERO_PAGE_X),
-            0x56: partial(self.lsr, mode=AddressingMode.ZERO_PAGE_X),
-            0x58: self.cli,
-            0x59: partial(self.eor, mode=AddressingMode.ABSOLUTE_Y),
-            0x5d: partial(self.eor, mode=AddressingMode.ABSOLUTE_X),
-            0x5e: partial(self.lsr, mode=AddressingMode.ABSOLUTE_X),
-            0x61: partial(self.adc, mode=AddressingMode.INDIRECT_X),
-            0x65: partial(self.adc, mode=AddressingMode.ZERO_PAGE),
-            0x66: partial(self.ror, mode=AddressingMode.ZERO_PAGE),
-            0x69: partial(self.adc, mode=AddressingMode.IMMEDIATE),
-            0x6a: partial(self.ror, mode=None),
-            0x6c: partial(self.jmp, mode="indirect"),
-            0x6d: partial(self.adc, mode=AddressingMode.ABSOLUTE),
-            0x6e: partial(self.ror, mode=AddressingMode.ABSOLUTE),
-            0x70: partial(self.branch, flag_index=self.STATUS_V, flag_value=1),
-            0x71: partial(self.adc, mode=AddressingMode.INDIRECT_Y),
-            0x75: partial(self.adc, mode=AddressingMode.ZERO_PAGE_X),
-            0x76: partial(self.ror, mode=AddressingMode.ZERO_PAGE_X),
-            0x78: self.sei,
-            0x79: partial(self.adc, mode=AddressingMode.ABSOLUTE_Y),
-            0x7d: partial(self.adc, mode=AddressingMode.ABSOLUTE_X),
-            0x7e: partial(self.ror, mode=AddressingMode.ABSOLUTE_X),
-            0x81: partial(self.sta, mode=AddressingMode.INDIRECT_X),
-            0x84: partial(self.sty, mode=AddressingMode.ZERO_PAGE),
-            0x85: partial(self.sta, mode=AddressingMode.ZERO_PAGE),
-            0x86: partial(self.stx, mode=AddressingMode.ZERO_PAGE),
-            0x88: self.dey,
-            0x8a: self.txa,
-            0x8c: partial(self.sty, mode=AddressingMode.ABSOLUTE),
-            0x8d: partial(self.sta, mode=AddressingMode.ABSOLUTE),
-            0x8e: partial(self.stx, mode=AddressingMode.ABSOLUTE),
-            0x90: partial(self.branch, flag_index=self.STATUS_C, flag_value=0),
-            0x91: partial(self.sta, mode=AddressingMode.INDIRECT_Y),
-            0x94: partial(self.sty, mode=AddressingMode.ZERO_PAGE_X),
-            0x95: partial(self.sta, mode=AddressingMode.ZERO_PAGE_X),
-            0x96: partial(self.stx, mode=AddressingMode.ZERO_PAGE_Y),
-            0x98: self.tya,
-            0x99: partial(self.sta, mode=AddressingMode.ABSOLUTE_Y),
-            0x9a: self.txs,
-            0x9d: partial(self.sta, mode=AddressingMode.ABSOLUTE_X),
-            0xa0: partial(self.ldy, mode=AddressingMode.IMMEDIATE),
-            0xa1: partial(self.lda, mode=AddressingMode.INDIRECT_X),
-            0xa2: partial(self.ldx, mode=AddressingMode.IMMEDIATE),
-            0xa4: partial(self.ldy, mode=AddressingMode.ZERO_PAGE),
-            0xa5: partial(self.lda, mode=AddressingMode.ZERO_PAGE),
-            0xa6: partial(self.ldx, mode=AddressingMode.ZERO_PAGE),
-            0xa8: self.tay,
-            0xa9: partial(self.lda, mode=AddressingMode.IMMEDIATE),
-            0xaa: self.tax,
-            0xac: partial(self.ldy, mode=AddressingMode.ABSOLUTE),
-            0xad: partial(self.lda, mode=AddressingMode.ABSOLUTE),
-            0xae: partial(self.ldx, mode=AddressingMode.ABSOLUTE),
-            0xb0: partial(self.branch, flag_index=self.STATUS_C, flag_value=1),
-            0xb1: partial(self.lda, mode=AddressingMode.INDIRECT_Y),
-            0xb4: partial(self.ldy, mode=AddressingMode.ZERO_PAGE_X),
-            0xb5: partial(self.lda, mode=AddressingMode.ZERO_PAGE_X),
-            0xb6: partial(self.ldx, mode=AddressingMode.ZERO_PAGE_Y),
-            0xb8: self.clv,
-            0xb9: partial(self.lda, mode=AddressingMode.ABSOLUTE_Y),
-            0xba: self.tsx,
-            0xbc: partial(self.ldy, mode=AddressingMode.ABSOLUTE_X),
-            0xbd: partial(self.lda, mode=AddressingMode.ABSOLUTE_X),
-            0xbe: partial(self.ldx, mode=AddressingMode.ABSOLUTE_Y),
-            0xc6: partial(self.dec, mode=AddressingMode.ZERO_PAGE),
-            0xc8: self.iny,
-            0xca: self.dex,
-            0xce: partial(self.dec, mode=AddressingMode.ABSOLUTE),
-            0xd0: partial(self.branch, flag_index=self.STATUS_Z, flag_value=0),
-            0xd6: partial(self.dec, mode=AddressingMode.ZERO_PAGE_X),
-            0xde: partial(self.dec, mode=AddressingMode.ABSOLUTE),
-            0xd8: self.cld,
-            0xe1: partial(self.sbc, mode=AddressingMode.INDIRECT_X),
-            0xe5: partial(self.sbc, mode=AddressingMode.ZERO_PAGE),
-            0xe6: partial(self.inc, mode=AddressingMode.ZERO_PAGE),
-            0xe8: self.inx,
-            0xe9: partial(self.sbc, mode=AddressingMode.IMMEDIATE),
-            0xea: self.nop,
-            0xed: partial(self.sbc, mode=AddressingMode.ABSOLUTE),
-            0xee: partial(self.inc, mode=AddressingMode.ABSOLUTE),
-            0xf0: partial(self.branch, flag_index=self.STATUS_Z, flag_value=1),
-            0xf1: partial(self.sbc, mode=AddressingMode.INDIRECT_Y),
-            0xf5: partial(self.sbc, mode=AddressingMode.ZERO_PAGE_X),
-            0xf6: partial(self.inc, mode=AddressingMode.ZERO_PAGE_X),
-            0xf8: self.sed,
-            0xf9: partial(self.sbc, mode=AddressingMode.ABSOLUTE_Y),
-            0xfd: partial(self.sbc, mode=AddressingMode.ABSOLUTE_X),
-            0xfe: partial(self.inc, mode=AddressingMode.ABSOLUTE_X),
-        }
+        opcode_table: dict[int, Callable[[], None]] = {}
+        for attr_name in dir(self):
+            attr = getattr(self, attr_name)
+            func = getattr(attr, "__func__", attr)
+
+            if not isinstance(func, OpcodeFunction):
+                continue
+
+            for opcode, kwargs in func.opcodes:
+                if opcode in opcode_table:
+                    msg = f"Opcode 0x{opcode:02x} has already been registered."
+                    raise ValueError(msg)
+                opcode_table[opcode] = partial(attr, **kwargs)
+
+        return opcode_table
 
     def step(self) -> StepResult:
         """Step one CPU tick.
@@ -399,6 +305,14 @@ class CPU6502:
         self.sp = (self.sp + 1) & 0xff
         return self.memory.read(self.STACK_ROOT + self.sp)
 
+    @opcode(0x10, flag_index=STATUS_N, flag_value=0)
+    @opcode(0x30, flag_index=STATUS_N, flag_value=1)
+    @opcode(0x50, flag_index=STATUS_V, flag_value=0)
+    @opcode(0x70, flag_index=STATUS_V, flag_value=1)
+    @opcode(0x90, flag_index=STATUS_C, flag_value=0)
+    @opcode(0xb0, flag_index=STATUS_C, flag_value=1)
+    @opcode(0xd0, flag_index=STATUS_Z, flag_value=0)
+    @opcode(0xf0, flag_index=STATUS_Z, flag_value=1)
     def branch(self, flag_index: int, flag_value: int) -> None:
         """Branch to relative address if specified flag is set or clear.
 
@@ -431,6 +345,7 @@ class CPU6502:
 
     # System instructions
 
+    @opcode(0x00)
     def brk(self) -> None:
         """Execute the BReaK (BRK) instruction."""
         self.status |= (1 << self.STATUS_I) | (1 << self.STATUS_B)
@@ -442,6 +357,8 @@ class CPU6502:
         self.push_byte_to_stack(pc_lo)
         self.push_byte_to_stack(self.status)
 
+    @opcode(0x4c, mode="absolute")
+    @opcode(0x6c, mode="absolute")
     def jmp(self, mode: Literal["absolute", "indirect"]) -> None:
         """Execute the JuMP (JMP) instruction.
 
@@ -451,6 +368,7 @@ class CPU6502:
         addr_lo = self.memory.read(self.pc)
         addr_hi = self.memory.read((self.pc + 1) & 0xffff)
         addr = (addr_hi << 8) | addr_lo
+
         if mode == "absolute":
             self.pc = addr
         elif mode == "indirect":
@@ -459,44 +377,56 @@ class CPU6502:
             addr_incremented = (addr & 0xff00) | ((addr + 1) & 0x00ff)
             addr_hi = self.memory.read(addr_incremented)
             self.pc = (addr_hi << 8) | addr_lo
+        else:
+            msg = f"Invalid mode {mode} for jmp."
+            raise ValueError(msg)
+
         self.cycles += 3 if mode == "absolute" else 5
 
+    @opcode(0xea)
     def nop(self) -> None:
         """Execute No OPeration (NOP) instruction."""
         self.cycles += 2
 
     # Flag instructions
 
+    @opcode(0x18)
     def clc(self) -> None:
         """Execute the CLear Carry (CLC) instruction."""
         self.status &= ~(1 << self.STATUS_C)
         self.cycles += 2
 
+    @opcode(0x38)
     def sec(self) -> None:
         """Execute the SEt Carry (SEC) instruction."""
         self.status |= (1 << self.STATUS_C)
         self.cycles += 2
 
+    @opcode(0x58)
     def cli(self) -> None:
         """Execute the CLear Interrupt (CLI) instruction."""
         self.status &= ~(1 << self.STATUS_I)
         self.cycles += 2
 
+    @opcode(0x78)
     def sei(self) -> None:
         """Execute the SEt Interrupt (SEI) instruction."""
         self.status |= (1 << self.STATUS_I)
         self.cycles += 2
 
+    @opcode(0xd8)
     def cld(self) -> None:
         """Execute the CLear Decimal (CLD) instruction."""
         self.status &= ~(1 << self.STATUS_D)
         self.cycles += 2
 
+    @opcode(0xf8)
     def sed(self) -> None:
         """Execute the SEt Decimal (SED) instruction."""
         self.status |= (1 << self.STATUS_D)
         self.cycles += 2
 
+    @opcode(0xb8)
     def clv(self) -> None:
         """Execute the CLear oVerflow (CLV) instruction."""
         self.status &= ~(1 << self.STATUS_V)
@@ -504,6 +434,14 @@ class CPU6502:
 
     # Register loading
 
+    @opcode(0xa9, mode=AddressingMode.IMMEDIATE)
+    @opcode(0xa5, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0xb5, mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0xad, mode=AddressingMode.ABSOLUTE)
+    @opcode(0xbd, mode=AddressingMode.ABSOLUTE_X)
+    @opcode(0xb9, mode=AddressingMode.ABSOLUTE_Y)
+    @opcode(0xa1, mode=AddressingMode.INDIRECT_X)
+    @opcode(0xb1, mode=AddressingMode.INDIRECT_Y)
     def lda(self, mode: AddressingMode) -> None:
         """Execute LDA instruction with specified addressing mode."""
         # load value into register
@@ -518,6 +456,11 @@ class CPU6502:
         self.update_zero_flag(self.a)
         self.update_negative_flag(self.a)
 
+    @opcode(0xa2, mode=AddressingMode.IMMEDIATE)
+    @opcode(0xa6, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0xb6, mode=AddressingMode.ZERO_PAGE_Y)
+    @opcode(0xae, mode=AddressingMode.ABSOLUTE)
+    @opcode(0xbe, mode=AddressingMode.ABSOLUTE_Y)
     def ldx(self, mode: AddressingMode) -> None:
         """Execute LDX instruction with specified addressing mode."""
         # load value into register
@@ -532,6 +475,11 @@ class CPU6502:
         self.update_zero_flag(self.x)
         self.update_negative_flag(self.x)
 
+    @opcode(0xa0, mode=AddressingMode.IMMEDIATE)
+    @opcode(0xa4, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0xb4, mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0xac, mode=AddressingMode.ABSOLUTE)
+    @opcode(0xbc, mode=AddressingMode.ABSOLUTE_X)
     def ldy(self, mode: AddressingMode) -> None:
         """Execute LDY instruction with specified addressing mode."""
         # load value into register
@@ -548,6 +496,13 @@ class CPU6502:
 
     # Register storing
 
+    @opcode(0x85, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0x95, mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0x8d, mode=AddressingMode.ABSOLUTE)
+    @opcode(0x9d, mode=AddressingMode.ABSOLUTE_X)
+    @opcode(0x99, mode=AddressingMode.ABSOLUTE_Y)
+    @opcode(0x81, mode=AddressingMode.INDIRECT_X)
+    @opcode(0x91, mode=AddressingMode.INDIRECT_Y)
     def sta(self, mode: AddressingMode) -> None:
         """Execute the STore A (STA) instruction."""
         # write register value to memory
@@ -555,6 +510,9 @@ class CPU6502:
         self.memory.write(addr, self.a)
         self.cycles += self.STORE_CYCLE_COUNTS[mode]
 
+    @opcode(0x86, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0x96, mode=AddressingMode.ZERO_PAGE_Y)
+    @opcode(0x8e, mode=AddressingMode.ABSOLUTE)
     def stx(self, mode: AddressingMode) -> None:
         """Execute the STore X (STX) instruction."""
         # write register value to memory
@@ -562,6 +520,9 @@ class CPU6502:
         self.memory.write(addr, self.x)
         self.cycles += self.STORE_CYCLE_COUNTS[mode]
 
+    @opcode(0x84, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0x94, mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0x8c, mode=AddressingMode.ABSOLUTE)
     def sty(self, mode: AddressingMode) -> None:
         """Execute the STore Y (STY) instruction."""
         # write register value to memory
@@ -571,6 +532,7 @@ class CPU6502:
 
     # Register transfer
 
+    @opcode(0xaa)
     def tax(self) -> None:
         """Execute the Transfer Accumulator to X (TAX) instruction."""
         self.x = self.a
@@ -578,6 +540,7 @@ class CPU6502:
         self.update_zero_flag(self.x)
         self.update_negative_flag(self.x)
 
+    @opcode(0xa8)
     def tay(self) -> None:
         """Execute the Transfer Accumulator to Y (TAY) instruction."""
         self.y = self.a
@@ -585,6 +548,7 @@ class CPU6502:
         self.update_zero_flag(self.y)
         self.update_negative_flag(self.y)
 
+    @opcode(0xba)
     def tsx(self) -> None:
         """Execute the Transfer Stack Pointer to X (TSX) instruction."""
         self.x = self.sp
@@ -592,6 +556,7 @@ class CPU6502:
         self.update_zero_flag(self.x)
         self.update_negative_flag(self.x)
 
+    @opcode(0x8a)
     def txa(self) -> None:
         """Execute the Transfer X to Accumulator (TXA) instruction."""
         self.a = self.x
@@ -599,11 +564,13 @@ class CPU6502:
         self.update_zero_flag(self.a)
         self.update_negative_flag(self.a)
 
+    @opcode(0x9a)
     def txs(self) -> None:
         """Execute the Transfer X to Stack Pointer (TXS) instruction."""
         self.sp = self.x
         self.cycles += 2
 
+    @opcode(0x98)
     def tya(self) -> None:
         """Execute the Transfer Y to Accumulator (TYA) instruction."""
         self.a = self.y
@@ -613,6 +580,10 @@ class CPU6502:
 
     # Unary arithmetic
 
+    @opcode(0xc6, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0xd6, mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0xce, mode=AddressingMode.ABSOLUTE)
+    @opcode(0xde, mode=AddressingMode.ABSOLUTE_X)
     def dec(self, mode: AddressingMode) -> None:
         """Execute the DECrement (DEC) instruction."""
         addr, _ = self.resolve_address(mode)
@@ -625,6 +596,7 @@ class CPU6502:
         self.update_zero_flag(byte)
         self.update_negative_flag(byte)
 
+    @opcode(0xca)
     def dex(self) -> None:
         """Execute the DEcrement X (DEX) instruction."""
         self.x = (self.x - 1) & 0xff
@@ -634,6 +606,7 @@ class CPU6502:
         self.update_zero_flag(self.x)
         self.update_negative_flag(self.x)
 
+    @opcode(0x88)
     def dey(self) -> None:
         """Execute the DEcrement Y (DEY) instruction."""
         self.y = (self.y - 1) & 0xff
@@ -643,6 +616,10 @@ class CPU6502:
         self.update_zero_flag(self.y)
         self.update_negative_flag(self.y)
 
+    @opcode(0xe6, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0xf6, mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0xee, mode=AddressingMode.ABSOLUTE)
+    @opcode(0xfe, mode=AddressingMode.ABSOLUTE_X)
     def inc(self, mode: AddressingMode) -> None:
         """Execute the INCrement (INC) instruction."""
         addr, _ = self.resolve_address(mode)
@@ -655,6 +632,7 @@ class CPU6502:
         self.update_zero_flag(byte)
         self.update_negative_flag(byte)
 
+    @opcode(0xe8)
     def inx(self) -> None:
         """Execute the INcrement X (INX) instruction."""
         self.x = (self.x + 1) & 0xff
@@ -664,6 +642,7 @@ class CPU6502:
         self.update_zero_flag(self.x)
         self.update_negative_flag(self.x)
 
+    @opcode(0xc8)
     def iny(self) -> None:
         """Execute the INcrement Y (INY) instruction."""
         self.y = (self.y + 1) & 0xff
@@ -673,6 +652,11 @@ class CPU6502:
         self.update_zero_flag(self.y)
         self.update_negative_flag(self.y)
 
+    @opcode(0x0a)
+    @opcode(0x06, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0x16, mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0x0e, mode=AddressingMode.ABSOLUTE)
+    @opcode(0x1e, mode=AddressingMode.ABSOLUTE_X)
     def asl(self, mode: AddressingMode | None) -> None:
         """Execute the Arithmetic Shift Left (ASL) instruction.
 
@@ -704,6 +688,11 @@ class CPU6502:
         self.update_zero_flag(value)
         self.update_negative_flag(value)
 
+    @opcode(0x4a)
+    @opcode(0x46, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0x56, mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0x4e, mode=AddressingMode.ABSOLUTE)
+    @opcode(0x5e, mode=AddressingMode.ABSOLUTE_X)
     def lsr(self, mode: AddressingMode | None) -> None:
         """Execute the Logic Shift Right (LSR) instruction.
 
@@ -735,6 +724,11 @@ class CPU6502:
         self.update_zero_flag(value)
         self.update_negative_flag(value)  # Always zero here
 
+    @opcode(0x2a)
+    @opcode(0x26, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0x36, mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0x2e, mode=AddressingMode.ABSOLUTE)
+    @opcode(0x3e, mode=AddressingMode.ABSOLUTE_X)
     def rol(self, mode: AddressingMode | None) -> None:
         """Execute the Rotate Left (ROL) instruction.
 
@@ -767,6 +761,11 @@ class CPU6502:
         self.update_zero_flag(value)
         self.update_negative_flag(value)
 
+    @opcode(0x6a)
+    @opcode(0x66, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0x76, mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0x6e, mode=AddressingMode.ABSOLUTE)
+    @opcode(0x7e, mode=AddressingMode.ABSOLUTE_X)
     def ror(self, mode: AddressingMode | None) -> None:
         """Execute the Rotate Right (ROR) instruction.
 
@@ -799,8 +798,16 @@ class CPU6502:
         self.update_zero_flag(value)
         self.update_negative_flag(value)
 
-    # Binary arithmetic (ADC, AND, EOR, ORA, SBC)
+    # Binary arithmetic
 
+    @opcode(0x69, mode=AddressingMode.IMMEDIATE)
+    @opcode(0x65, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0x75, mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0x6d, mode=AddressingMode.ABSOLUTE)
+    @opcode(0x7d, mode=AddressingMode.ABSOLUTE_X)
+    @opcode(0x79, mode=AddressingMode.ABSOLUTE_Y)
+    @opcode(0x61, mode=AddressingMode.INDIRECT_X)
+    @opcode(0x71, mode=AddressingMode.INDIRECT_Y)
     def adc(self, mode: AddressingMode) -> None:
         """Execute the ADd with Carry (ADC) instruction."""
         addr, page_boundary_crossed = self.resolve_address(mode)
@@ -838,6 +845,14 @@ class CPU6502:
         if page_boundary_crossed and mode in (*self.BINARY_EXTRA_CYCLE_MODES, AddressingMode.INDIRECT_Y):
             self.cycles += 1
 
+    @opcode(0x29, mode=AddressingMode.IMMEDIATE)
+    @opcode(0x25, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0x35, mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0x2d, mode=AddressingMode.ABSOLUTE)
+    @opcode(0x3d, mode=AddressingMode.ABSOLUTE_X)
+    @opcode(0x39, mode=AddressingMode.ABSOLUTE_Y)
+    @opcode(0x21, mode=AddressingMode.INDIRECT_X)
+    @opcode(0x31, mode=AddressingMode.INDIRECT_Y)
     def and_op(self, mode: AddressingMode) -> None:
         """Execute the AND instruction."""
         addr, page_boundary_crossed = self.resolve_address(mode)
@@ -852,6 +867,14 @@ class CPU6502:
         if page_boundary_crossed and mode in (*self.BINARY_EXTRA_CYCLE_MODES, AddressingMode.INDIRECT_Y):
             self.cycles += 1
 
+    @opcode(0x49, mode=AddressingMode.IMMEDIATE)
+    @opcode(0x45, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0x55, mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0x4d, mode=AddressingMode.ABSOLUTE)
+    @opcode(0x5d, mode=AddressingMode.ABSOLUTE_X)
+    @opcode(0x59, mode=AddressingMode.ABSOLUTE_Y)
+    @opcode(0x41, mode=AddressingMode.INDIRECT_X)
+    @opcode(0x51, mode=AddressingMode.INDIRECT_Y)
     def eor(self, mode: AddressingMode) -> None:
         """Execute the Exclusive OR instruction."""
         addr, page_boundary_crossed = self.resolve_address(mode)
@@ -866,6 +889,14 @@ class CPU6502:
         if page_boundary_crossed and mode in self.BINARY_EXTRA_CYCLE_MODES:
             self.cycles += 1
 
+    @opcode(0x09, mode=AddressingMode.IMMEDIATE)
+    @opcode(0x05, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0x15, mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0x0d, mode=AddressingMode.ABSOLUTE)
+    @opcode(0x1d, mode=AddressingMode.ABSOLUTE_X)
+    @opcode(0x19, mode=AddressingMode.ABSOLUTE_Y)
+    @opcode(0x01, mode=AddressingMode.INDIRECT_X)
+    @opcode(0x11, mode=AddressingMode.INDIRECT_Y)
     def ora(self, mode: AddressingMode) -> None:
         """Execute the OR with Accumulator instruction."""
         addr, page_boundary_crossed = self.resolve_address(mode)
@@ -880,6 +911,14 @@ class CPU6502:
         if page_boundary_crossed and mode in self.BINARY_EXTRA_CYCLE_MODES:
             self.cycles += 1
 
+    @opcode(0xe9, mode=AddressingMode.IMMEDIATE)
+    @opcode(0xe5, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0xf5, mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0xed, mode=AddressingMode.ABSOLUTE)
+    @opcode(0xfd, mode=AddressingMode.ABSOLUTE_X)
+    @opcode(0xf9, mode=AddressingMode.ABSOLUTE_Y)
+    @opcode(0xe1, mode=AddressingMode.INDIRECT_X)
+    @opcode(0xf1, mode=AddressingMode.INDIRECT_Y)
     def sbc(self, mode: AddressingMode) -> None:
         """Execute the SuBtract with Carry / borrow (SBC) instruction."""
         addr, page_boundary_crossed = self.resolve_address(mode)
@@ -919,6 +958,8 @@ class CPU6502:
 
     # Binary logic
 
+    @opcode(0x24, mode=AddressingMode.ZERO_PAGE)
+    @opcode(0x2c, mode=AddressingMode.ABSOLUTE)
     def bit(self, mode: AddressingMode) -> None:
         """Execute the BIT test (BIT) instruction."""
         addr, _ = self.resolve_address(mode)
