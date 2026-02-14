@@ -977,3 +977,49 @@ class CPU6502:
         self.status |= (operand_mask_zero << self.STATUS_Z)
 
         self.cycles += self.BINARY_CYCLE_COUNTS[mode]
+
+    @opcode(0xc9, register="a", mode=AddressingMode.IMMEDIATE)
+    @opcode(0xc5, register="a", mode=AddressingMode.ZERO_PAGE)
+    @opcode(0xd5, register="a", mode=AddressingMode.ZERO_PAGE_X)
+    @opcode(0xcd, register="a", mode=AddressingMode.ABSOLUTE)
+    @opcode(0xdd, register="a", mode=AddressingMode.ABSOLUTE_X)
+    @opcode(0xd9, register="a", mode=AddressingMode.ABSOLUTE_Y)
+    @opcode(0xc1, register="a", mode=AddressingMode.INDIRECT_X)
+    @opcode(0xd1, register="a", mode=AddressingMode.INDIRECT_Y)
+    @opcode(0xe0, register="x", mode=AddressingMode.IMMEDIATE)
+    @opcode(0xe4, register="x", mode=AddressingMode.ZERO_PAGE)
+    @opcode(0xec, register="x", mode=AddressingMode.ABSOLUTE)
+    @opcode(0xc0, register="y", mode=AddressingMode.IMMEDIATE)
+    @opcode(0xc4, register="y", mode=AddressingMode.ZERO_PAGE)
+    @opcode(0xcc, register="y", mode=AddressingMode.ABSOLUTE)
+    def compare(self, register: Literal["a", "x", "y"], mode: AddressingMode) -> None:
+        """Execute the compare instruction (CMP, CPX, CPY)."""
+        if register == "a":
+            register_value = self.a
+        elif register == "x":
+            register_value = self.x
+        elif register == "y":
+            register_value = self.y
+        else:
+            msg = f"Invalid register '{register}'."
+            raise ValueError(msg)
+
+        self.compare_logic(register_value, mode)
+
+    def compare_logic(self, register_value: int, mode: AddressingMode) -> None:
+        """Execute logic for comparison instructions and update registers and cycle counts."""
+        addr, page_boundary_crossed = self.resolve_address(mode)
+        operand = self.memory.read(addr)
+
+        binary_intermediate_difference = register_value + (~operand & 0xff) + 1
+        carry_out = (binary_intermediate_difference >> 8) & 1
+        binary_result = binary_intermediate_difference & 0xff
+
+        self.status &= ~(1 << self.STATUS_C)
+        self.status |= (carry_out << self.STATUS_C)
+        self.update_zero_flag(binary_result)
+        self.update_negative_flag(binary_result)
+
+        self.cycles += self.BINARY_CYCLE_COUNTS[mode]
+        if page_boundary_crossed and mode in (*self.BINARY_EXTRA_CYCLE_MODES, AddressingMode.INDIRECT_Y):
+            self.cycles += 1
