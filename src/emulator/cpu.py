@@ -305,6 +305,8 @@ class CPU6502:
         self.sp = (self.sp + 1) & 0xff
         return self.memory.read(self.STACK_ROOT + self.sp)
 
+    # System instructions
+
     @opcode(0x10, flag_index=STATUS_N, flag_value=0)
     @opcode(0x30, flag_index=STATUS_N, flag_value=1)
     @opcode(0x50, flag_index=STATUS_V, flag_value=0)
@@ -343,8 +345,6 @@ class CPU6502:
             self.pc += 1
             self.cycles += 2
 
-    # System instructions
-
     @opcode(0x00)
     def brk(self) -> None:
         """Execute the BReaK (BRK) instruction."""
@@ -382,6 +382,24 @@ class CPU6502:
             raise ValueError(msg)
 
         self.cycles += 3 if mode == "absolute" else 5
+
+    @opcode(0x20)
+    def jsr(self) -> None:
+        """Execute the Jump to SubRoutine (JSR) instruction."""
+        sr_addr_lo = self.memory.read(self.pc)
+        sr_addr_hi = self.memory.read((self.pc + 1) & 0xffff)
+        sr_addr = (sr_addr_hi << 8) | sr_addr_lo
+
+        # point to last byte of jsr instruction
+        return_addr = (self.pc + 1) & 0xffff
+        return_addr_lo = return_addr & 0xff
+        return_addr_hi = (return_addr >> 8) & 0xff
+
+        self.push_byte_to_stack(return_addr_hi)
+        self.push_byte_to_stack(return_addr_lo)
+
+        self.pc = sr_addr
+        self.cycles += 6
 
     @opcode(0xea)
     def nop(self) -> None:
