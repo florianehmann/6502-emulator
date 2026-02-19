@@ -58,3 +58,32 @@ def test_loop_program(cpu: CPU6502):
 
     assert cpu.cycles == 59  # noqa: PLR2004
     assert cpu.memory.read(0x0200) == 0x05  # noqa: PLR2004
+
+
+def test_subroutine_program(cpu: CPU6502):
+    """Test if jumping to and returning from subroutines works."""
+    cpu.memory.write_bytes_hex(0x300,
+                    # * = $0300
+        "a9 05"     #       LDA #$05
+        "20 09 03"  #       JSR DECA
+        "18"        #       CLC
+        "69 02"     #       ADC #$02
+        "00"        #       BRK
+        "38"        # DECA: SEC
+        "e9 01"     #       SBC #$01
+        "60",       #       RTS
+    )
+    cpu.pc = 0x0300
+    steps = 0
+    while True:
+        result = cpu.step()
+        steps += 1
+
+        if result == StepResult.BRK:
+            break
+
+        if steps > 10:  # noqa: PLR2004
+            pytest.fail("Program didn't halt.")
+
+    assert cpu.cycles == 29  # noqa: PLR2004
+    assert cpu.a == 6  # noqa: PLR2004

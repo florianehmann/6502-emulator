@@ -43,6 +43,7 @@ def test_jmp_indirect_page_boundary_bug(cpu: CPU6502):
 
 
 def test_jsr(cpu: CPU6502):  # noqa: D103
+    jsr_cycle_count = 6
     subroutine_address = 0x0208
     subroutine_address_hi = (subroutine_address >> 8) & 0xff
     subroutine_address_lo = subroutine_address & 0xff
@@ -55,6 +56,21 @@ def test_jsr(cpu: CPU6502):  # noqa: D103
     assert cpu.pc == subroutine_address
     assert cpu.pull_byte_from_stack() == jsr_last_byte_address_lo
     assert cpu.pull_byte_from_stack() == jsr_last_byte_address_hi
+    assert cpu.cycles == jsr_cycle_count
+
+
+def test_rts(cpu: CPU6502):  # noqa: D103
+    rts_cycle_count = 6
+    subroutine_address = 0x0208
+    jsr_last_byte_address = 0x0203
+    jsr_last_byte_address_hi = (jsr_last_byte_address >> 8) & 0xff
+    jsr_last_byte_address_lo = jsr_last_byte_address & 0xff
+    cpu.push_byte_to_stack(jsr_last_byte_address_hi)
+    cpu.push_byte_to_stack(jsr_last_byte_address_lo)
+    cpu.pc = subroutine_address + 1  # point to rts opcode
+    cpu.rts()
+    assert cpu.pc == jsr_last_byte_address + 1
+    assert cpu.cycles == rts_cycle_count
 
 
 def test_nop(cpu: CPU6502):  # noqa: D103

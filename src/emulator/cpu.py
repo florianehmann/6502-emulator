@@ -406,6 +406,15 @@ class CPU6502:
         """Execute No OPeration (NOP) instruction."""
         self.cycles += 2
 
+    @opcode(0x60)
+    def rts(self) -> None:
+        """Execute the ReTurn from Subroutine (RTS) instruction."""
+        return_addr_lo = self.pull_byte_from_stack()
+        return_addr_hi = self.pull_byte_from_stack()
+        return_addr = (return_addr_hi << 8) | return_addr_lo
+        self.pc = return_addr + 1
+        self.cycles += 6
+
     # Flag instructions
 
     @opcode(0x18)
