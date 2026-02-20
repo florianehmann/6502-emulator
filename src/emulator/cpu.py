@@ -605,6 +605,14 @@ class CPU6502:
         self.update_zero_flag(self.a)
         self.update_negative_flag(self.a)
 
+    # Stack instructions
+
+    @opcode(0x48)
+    def pha(self) -> None:
+        """Execute the PusH Accumulator (PHA) instruction."""
+        self.push_byte_to_stack(self.a)
+        self.cycles += 3
+
     # Unary arithmetic
 
     @opcode(0xc6, mode=AddressingMode.ZERO_PAGE)
