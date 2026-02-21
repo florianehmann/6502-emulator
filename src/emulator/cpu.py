@@ -613,6 +613,29 @@ class CPU6502:
         self.push_byte_to_stack(self.a)
         self.cycles += 3
 
+    @opcode(0x08)
+    def php(self) -> None:
+        """Execute the PusH Processor status (PHP) instruction."""
+        status_to_push = self.status | (1 << self.STATUS_B)
+        self.push_byte_to_stack(status_to_push)
+        self.cycles += 3
+
+    @opcode(0x68)
+    def pla(self) -> None:
+        """Execute the PuLl Accumulator (PLA) instruction."""
+        self.a = self.pull_byte_from_stack()
+        self.update_negative_flag(self.a)
+        self.update_zero_flag(self.a)
+        self.cycles += 4
+
+    @opcode(0x28)
+    def plp(self) -> None:
+        """Execute the PuLl Processor status (PLP) instruction."""
+        pulled_status = self.pull_byte_from_stack()
+        pulled_status &= ~(1 << self.STATUS_B)
+        self.status = pulled_status
+        self.cycles += 4
+
     # Unary arithmetic
 
     @opcode(0xc6, mode=AddressingMode.ZERO_PAGE)
