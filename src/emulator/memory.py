@@ -135,6 +135,64 @@ class MemoryMapRegion:
         return other.offset in self or other.top in self
 
 
+class MMIOHandler(ABC):
+    """Handles reads from and writes to a Memory-Mapped Input/Output register."""
+
+    @abstractmethod
+    def read(self) -> int:
+        """Read from MMIO register."""
+
+    @abstractmethod
+    def write(self, value: int) -> None:
+        """Write to MMIO register."""
+
+
+class MMIOBlock(Memory):
+    """Region of memory dedicated to MMIO registers."""
+
+    def __init__(self) -> None:  # noqa: D107
+        super().__init__()
+        self.registers: dict[int, MMIOHandler] = {}
+
+    def add_register(self, offset: int, handler: MMIOHandler) -> Self:
+        """Add an MMIO register to the MMIO block by registering a handler.
+
+        Args:
+            offset: Address within the MMIO block at which to place the register.
+            handler: Handler responsible for handling reads and writes of the register.
+
+        Raises:
+            ValueError: If the specified offset already holds a register.
+
+        Returns:
+            self: Self reference for fluent interface.
+
+        """
+        if offset in self.registers:
+            msg = f"Offset {offset:04x} already holds a register."
+            raise ValueError(msg)
+        self.registers[offset] = handler
+        return self
+
+    @override
+    def __len__(self) -> int:
+        return max(self.registers) + 1
+
+    @override
+    def read(self, address: int) -> int:
+        if address not in self.registers:
+            logger.warning(f"Tried to read from unknown register at offset {address:04x}")
+            return 0
+        return self.registers[address].read()
+
+    @override
+    def write(self, address: int, value: int) -> None:
+        if address not in self.registers:
+            logger.warning(f"Tried to write to unknown register at offset {address:04x}")
+            return
+        self.registers[address].write(value)
+
+
 class MemoryMap(Memory):
     """Memory map of multiple components."""
 
@@ -167,7 +225,7 @@ class MemoryMap(Memory):
         if region is None:
             logger.warning(f"Tried to read address 0x{address:04x} that is not part of memory map.")
             return 0
-        return region.memory.read(address)
+        return region.memory.read(address - region.offset)
 
     @override
     def write(self, address: int, value: int) -> None:
@@ -175,5 +233,5 @@ class MemoryMap(Memory):
         if region is None:
             logger.warning(f"Tried to write to address 0x{address:04x} that is not part of memory map.")
             return None
-        return region.memory.write(address, value)
+        return region.memory.write(address - region.offset, value)
 
