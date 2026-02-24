@@ -4,11 +4,36 @@ from emulator.cpu import CPU6502, StepResult
 from emulator.memory import MemoryBlock, MemoryMap
 from emulator.peripherals import TerminalPeripheral
 
-program = bytes.fromhex(
-    "a9 41"     # LDA 'A        ; Load character 'A'
-    "8d 01 d0"  # STA $D001     ; Store to MMIO for output
-    "00",       # BRK
-)
+# .ORG $1000
+#
+# ; MMIO register for writing to terminal
+# TERMOUT = $d001
+#
+# JMP START
+#
+# ; data section
+#
+# MSG:
+#         .ASCII "Hello, World!"
+#         .BYTE $0A ; newline
+# MSG_END:
+#
+# ; text section
+#
+# START:
+#         LDX #0
+# !       LDA MSG,X
+#         STA TERMOUT
+#         INX
+#         CPX #MSG_END-MSG
+#         BNE !-
+#         BRK
+program = bytes.fromhex("""
+4C 11 10 48 65 6C 6C 6F
+2C 20 57 6F 72 6C 64 21
+0A A2 00 BD 03 10 8D 01
+D0 E8 E0 0E D0 F5 00
+""")
 
 
 if __name__ == "__main__":
@@ -21,8 +46,6 @@ if __name__ == "__main__":
         .add_block(0x1000, program_memory)
         .add_block(0xd000, terminal.mmio_block)
     )
-    system_memory.write(0xd001, 65)
-    system_memory.write(0xd001, 66)
 
     cpu = CPU6502(system_memory)
     cpu.pc = 0x1000
@@ -34,8 +57,6 @@ if __name__ == "__main__":
         if result == StepResult.BRK:
             break
 
-        if steps > 10:  # noqa: PLR2004
+        if steps > 100:  # noqa: PLR2004
             print("Program didn't halt.")  # noqa: T201
-
-    print()  # noqa: T201
-
+            break

@@ -195,9 +195,8 @@ class MemoryMap(Memory):
 
     @override
     def __len__(self) -> int:
-        bottom = min(r.offset for r in self.regions)
         top = max(r.top for r in self.regions)
-        return top - bottom + 1
+        return top + 1
 
     @override
     def read(self, address: int) -> int:
