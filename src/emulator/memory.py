@@ -2,6 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Self, override
 
@@ -135,62 +136,35 @@ class MemoryMapRegion:
         return other.offset in self or other.top in self
 
 
-class MMIOHandler(ABC):
-    """Handles reads from and writes to a Memory-Mapped Input/Output register."""
+class MMIORegister(Memory):
+    """Memory address that contains Memory-Mapped I/O (MMIO) functionality."""
 
-    @abstractmethod
-    def read(self) -> int:
-        """Read from MMIO register."""
-
-    @abstractmethod
-    def write(self, value: int) -> None:
-        """Write to MMIO register."""
-
-
-class MMIOBlock(Memory):
-    """Region of memory dedicated to MMIO registers."""
-
-    def __init__(self) -> None:  # noqa: D107
-        super().__init__()
-        self.registers: dict[int, MMIOHandler] = {}
-
-    def add_register(self, offset: int, handler: MMIOHandler) -> Self:
-        """Add an MMIO register to the MMIO block by registering a handler.
+    def __init__(
+        self, read_callback: Callable[[], int] = lambda: 0,
+        write_callback: Callable[[int], None] = lambda _: None,
+    ) -> None:
+        """Initialize MMIO register with callbacks functions that are called when a read or write occurs.
 
         Args:
-            offset: Address within the MMIO block at which to place the register.
-            handler: Handler responsible for handling reads and writes of the register.
-
-        Raises:
-            ValueError: If the specified offset already holds a register.
-
-        Returns:
-            self: Self reference for fluent interface.
+            read_callback: Function that is called when the register is read from.
+            write_callback: Function that is called when the register is written to.
 
         """
-        if offset in self.registers:
-            msg = f"Offset {offset:04x} already holds a register."
-            raise ValueError(msg)
-        self.registers[offset] = handler
-        return self
+        super().__init__()
+        self.read_callback = read_callback
+        self.write_callback = write_callback
 
     @override
     def __len__(self) -> int:
-        return max(self.registers) + 1
+        return 1
 
     @override
     def read(self, address: int) -> int:
-        if address not in self.registers:
-            logger.warning(f"Tried to read from unknown register at offset {address:04x}")
-            return 0
-        return self.registers[address].read()
+        return self.read_callback()
 
     @override
     def write(self, address: int, value: int) -> None:
-        if address not in self.registers:
-            logger.warning(f"Tried to write to unknown register at offset {address:04x}")
-            return
-        self.registers[address].write(value)
+        self.write_callback(value)
 
 
 class MemoryMap(Memory):
@@ -218,6 +192,12 @@ class MemoryMap(Memory):
             return next(r for r in self.regions if address in r)
         except StopIteration:
             return None
+
+    @override
+    def __len__(self) -> int:
+        bottom = min(r.offset for r in self.regions)
+        top = max(r.top for r in self.regions)
+        return top - bottom + 1
 
     @override
     def read(self, address: int) -> int:
