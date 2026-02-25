@@ -1,6 +1,6 @@
 """Generate a Hello World output message."""  # noqa: INP001
 
-from emulator.cpu import CPU6502, StepResult
+from emulator.cpu import CPU6502, run
 from emulator.memory import MemoryBlock, MemoryMap
 from emulator.peripherals import TerminalPeripheral
 
@@ -49,14 +49,4 @@ if __name__ == "__main__":
 
     cpu = CPU6502(system_memory)
     cpu.pc = 0x1000
-    steps = 0
-    while True:
-        result = cpu.step()
-        steps += 1
-
-        if result == StepResult.BRK:
-            break
-
-        if steps > 100:  # noqa: PLR2004
-            print("Program didn't halt.")  # noqa: T201
-            break
+    run(cpu)

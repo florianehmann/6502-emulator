@@ -1,8 +1,6 @@
 """Test simple 6502 machine code to exercise instructions in combination."""
 
-import pytest
-
-from emulator.cpu import CPU6502, StepResult
+from emulator.cpu import CPU6502, run
 
 
 def test_minimal_program(cpu: CPU6502):
@@ -15,16 +13,7 @@ def test_minimal_program(cpu: CPU6502):
         "00",       # BRK
     )
     cpu.pc = 0x200
-    steps = 0
-    while True:
-        result = cpu.step()
-        steps += 1
-
-        if result == StepResult.BRK:
-            break
-
-        if steps > 10:  # noqa: PLR2004
-            pytest.fail("Program didn't halt.")
+    run(cpu)
 
     assert cpu.a == 5  # noqa: PLR2004
     assert cpu.memory.read(0x0200) == 1
@@ -45,16 +34,7 @@ def test_loop_program(cpu: CPU6502):
         "00",       # BRK
     )
     cpu.pc = 0x0300
-    steps = 0
-    while True:
-        result = cpu.step()
-        steps += 1
-
-        if result == StepResult.BRK:
-            break
-
-        if steps > 300:  # noqa: PLR2004
-            pytest.fail("Program didn't halt.")
+    run(cpu)
 
     assert cpu.cycles == 59  # noqa: PLR2004
     assert cpu.memory.read(0x0200) == 0x05  # noqa: PLR2004
@@ -74,16 +54,7 @@ def test_subroutine_program(cpu: CPU6502):
         "60",       #       RTS
     )
     cpu.pc = 0x0300
-    steps = 0
-    while True:
-        result = cpu.step()
-        steps += 1
-
-        if result == StepResult.BRK:
-            break
-
-        if steps > 10:  # noqa: PLR2004
-            pytest.fail("Program didn't halt.")
+    run(cpu)
 
     assert cpu.cycles == 29  # noqa: PLR2004
     assert cpu.a == 6  # noqa: PLR2004

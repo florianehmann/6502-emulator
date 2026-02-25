@@ -1081,3 +1081,32 @@ class CPU6502:
         self.cycles += self.BINARY_CYCLE_COUNTS[mode]
         if page_boundary_crossed and mode in (*self.BINARY_EXTRA_CYCLE_MODES, AddressingMode.INDIRECT_Y):
             self.cycles += 1
+
+
+def run(
+    cpu: CPU6502,
+    max_steps: int | None = 10_000,
+) -> None:
+    """Let a CPU run it's program.
+
+    Args:
+        cpu: CPU to let run.
+        max_steps: Maximum number of instructions to execute. If set to None there is no limit on number of
+        instructions.
+
+    Raises:
+        RuntimeError: When maximum number of steps is reached.
+
+    """
+    steps = 0
+    while True:
+        result = cpu.step()
+        steps += 1
+
+        if result == StepResult.BRK:
+            break
+
+        if max_steps is not None:  # noqa: SIM102, doesn't work here
+            if steps > max_steps:
+                msg = "Maximum number of steps reached."
+                raise RuntimeError(msg)
