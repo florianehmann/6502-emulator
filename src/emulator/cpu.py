@@ -358,7 +358,7 @@ class CPU6502:
         self.push_byte_to_stack(self.status)
 
     @opcode(0x4c, mode="absolute")
-    @opcode(0x6c, mode="absolute")
+    @opcode(0x6c, mode="indirect")
     def jmp(self, mode: Literal["absolute", "indirect"]) -> None:
         """Execute the JuMP (JMP) instruction.
 
