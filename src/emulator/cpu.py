@@ -69,6 +69,10 @@ class CPU6502:
 
     STACK_ROOT = 0x0100
 
+    NMI_VECTOR = 0xfffa
+    RST_VECTOR = 0xfffc
+    IRQ_VECTOR = 0xfffe
+
     LOAD_CYCLE_COUNTS: ClassVar[dict[AddressingMode, int]] = {
         AddressingMode.IMMEDIATE: 2,
         AddressingMode.ZERO_PAGE: 3,
@@ -305,6 +309,37 @@ class CPU6502:
         self.sp = (self.sp + 1) & 0xff
         return self.memory.read(self.STACK_ROOT + self.sp)
 
+    def _interrupt(self, interrupt_type: Literal["maskable", "non-maskable", "break"]) -> None:
+        """Initiate an interrupt.
+
+        This function is called in between CPU steps, so in this state the program counter points to the opcode byte of
+        the next instruction to be executed.
+        """
+        if interrupt_type == "maskable":
+            interrupt_disable_flag = self.status & (1 << self.STATUS_I) > 0
+            if interrupt_disable_flag:
+                return
+
+        if interrupt_type == "break":
+            self.status |= (1 << self.STATUS_B)
+
+        self.cycles += 7
+        pc_lo = self.pc & 0xff
+        pc_hi = (self.pc >> 8) & 0xff
+        self.push_byte_to_stack(pc_hi)
+        self.push_byte_to_stack(pc_lo)
+        self.push_byte_to_stack(self.status)
+
+        self.status |= (1 << self.STATUS_I)
+
+        vector = self.IRQ_VECTOR
+        if interrupt_type == "non-maskable":
+            vector = self.NMI_VECTOR
+
+        isr_lo = self.memory.read(vector)
+        isr_hi = self.memory.read(vector + 1)
+        self.pc = (isr_hi << 8) | isr_lo
+
     # System instructions
 
     @opcode(0x10, flag_index=STATUS_N, flag_value=0)
@@ -348,14 +383,8 @@ class CPU6502:
     @opcode(0x00)
     def brk(self) -> None:
         """Execute the BReaK (BRK) instruction."""
-        self.status |= (1 << self.STATUS_I) | (1 << self.STATUS_B)
         self.pc += 1
-        self.cycles += 7
-        pc_lo = self.pc & 0xff
-        pc_hi = (self.pc >> 8) & 0xff
-        self.push_byte_to_stack(pc_hi)
-        self.push_byte_to_stack(pc_lo)
-        self.push_byte_to_stack(self.status)
+        self._interrupt("break")
 
     @opcode(0x4c, mode="absolute")
     @opcode(0x6c, mode="indirect")

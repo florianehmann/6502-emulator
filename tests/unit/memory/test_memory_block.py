@@ -18,10 +18,9 @@ def test_write_bytes_hex(memory: MemoryBlock):  # noqa: D103
     assert memory.read(1) == 0xcd  # noqa: PLR2004
 
 
-def test_out_of_bounds_access(memory: MemoryBlock):  # noqa: D103
-    with pytest.raises(IndexError, match="out of memory range"):
-        memory.read(len(memory.mem))
-
+def test_out_of_bounds_access(memory: MemoryBlock, caplog: pytest.LogCaptureFixture):  # noqa: D103
+    memory.read(len(memory.mem))
+    assert "out of memory range" in caplog.text
 
 def test_memory_size():
     """Test if we can read the size of a memory block with the `len` function."""

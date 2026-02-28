@@ -58,11 +58,13 @@ class MemoryBlock(Memory):
         super().__init__()
         self.mem = bytearray(size)
 
-    def _check_address_bounds(self, address: int) -> None:
+    def _check_address_in_bounds(self, address: int) -> bool:
         """Check if memory address is within the bound of this memory."""
         if not (0 <= address < len(self.mem)):
-            msg = f"Address {address:04x} out of memory range."
-            raise IndexError(msg)
+            msg = f"Address {address:04X} out of memory range."
+            logger.error(msg)
+            return False
+        return True
 
     @override
     def __len__(self) -> int:
@@ -70,12 +72,14 @@ class MemoryBlock(Memory):
 
     @override
     def read(self, address: int) -> int:
-        self._check_address_bounds(address)
+        if not self._check_address_in_bounds(address):
+            return 0
         return self.mem[address]
 
     @override
     def write(self, address: int, value: int) -> None:
-        self._check_address_bounds(address)
+        if not self._check_address_in_bounds(address):
+            return
         self.mem[address] = value & 0xff
 
     def write_bytes(self, start_address: int, sequence: bytes) -> None:
@@ -89,8 +93,8 @@ class MemoryBlock(Memory):
             IndexError: If sequence at specified location exceeds the bounds of the memory.
 
         """
-        self._check_address_bounds(start_address)
-        self._check_address_bounds(start_address + len(sequence))
+        self._check_address_in_bounds(start_address)
+        self._check_address_in_bounds(start_address + len(sequence))
         self.mem[start_address:start_address + len(sequence)] = sequence
 
     def write_bytes_hex(self, start_address: int, sequence: str) -> None:
@@ -104,9 +108,7 @@ class MemoryBlock(Memory):
             IndexError: If sequence at specified location exceeds the bounds of the memory.
 
         """
-        self._check_address_bounds(start_address)
-        self._check_address_bounds(start_address + len(sequence))
-        self.mem[start_address:start_address + len(sequence)] = bytes.fromhex(sequence)
+        self.write_bytes(start_address, bytes.fromhex(sequence))
 
 
 @dataclass
