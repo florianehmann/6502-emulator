@@ -2,6 +2,7 @@
 
 import enum
 import logging
+import time
 from collections.abc import Callable
 from functools import partial
 from typing import Any, ClassVar, Literal, Protocol, cast, runtime_checkable
@@ -1134,6 +1135,8 @@ class CPU6502:
 def run(
     cpu: CPU6502,
     max_steps: int | None = 10_000,
+    interrupt_hook: Callable[[CPU6502], None] | None = None,
+    cycles_per_second: float | None = None,
 ) -> None:
     """Let a CPU run it's program.
 
@@ -1146,7 +1149,9 @@ def run(
         RuntimeError: When maximum number of steps is reached.
 
     """
+    time_per_cycle = 1 / cycles_per_second if cycles_per_second is not None else 0
     steps = 0
+    cycles_at_last_sleep = 0
     while True:
         result = cpu.step()
         steps += 1
@@ -1154,7 +1159,15 @@ def run(
         if result == StepResult.BRK:
             break
 
+        if interrupt_hook is not None:
+            interrupt_hook(cpu)
+
         if max_steps is not None:  # noqa: SIM102, doesn't work here
             if steps > max_steps:
                 msg = "Maximum number of steps reached."
                 raise RuntimeError(msg)
+
+        if cycles_per_second is not None:
+            cycles_since_last_sleep = cpu.cycles - cycles_at_last_sleep
+            time.sleep(cycles_since_last_sleep * time_per_cycle)
+            cycles_at_last_sleep = cpu.cycles

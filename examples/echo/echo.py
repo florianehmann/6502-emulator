@@ -11,23 +11,21 @@ from emulator.memory import MemoryBlock, MemoryMap
 from emulator.peripherals import TerminalPeripheral, monitor_stdin
 
 
-def handle_inputs(input_queue: Queue[bytes | None]) -> None:
-    """Handle incoming bytes from the terminal."""
+def interrupt_hook(cpu: CPU6502, input_queue: Queue[bytes | None], terminal: TerminalPeripheral) -> None:
+    """Interrupt hook to handle terminal input."""
     if input_queue.qsize() > 0:
         ch = input_queue.get()
         if ch is None:
             sys.exit(0)
-        sys.stdout.buffer.write(ch)
-        sys.stdout.buffer.flush()
+        terminal.receive_input(ch[0])
+        cpu.irq()
 
 
-if __name__ == "__main__":
-    input_queue = Queue()
-    input_handler = partial(handle_inputs, input_queue)
-    # Thread(target=monitor_stdin, args=(input_queue,)).start()
-
+def main() -> None:  # noqa: D103
+    input_queue: Queue[bytes | None] = Queue()
+    Thread(target=monitor_stdin, args=(input_queue,)).start()
     terminal = TerminalPeripheral()
-    terminal._input_buffer = 10 # hack additional newline into output
+    interrupt_hook_with_queue = partial(interrupt_hook, input_queue=input_queue, terminal=terminal)
 
     ram = MemoryBlock(0xD000)
     rom = MemoryBlock(0x2000)
@@ -42,8 +40,8 @@ if __name__ == "__main__":
     cpu = CPU6502(memory_map)
     start_address = (memory_map.read(0xFFFD) << 8) | memory_map.read(0xFFFC)
     cpu.pc = start_address
-    run(cpu)
+    run(cpu, interrupt_hook=interrupt_hook_with_queue, max_steps=None, cycles_per_second=1000)
 
-    # while True:
-    #     input_handler()
-    #     sleep(0.01)
+
+if __name__ == "__main__":
+    main()

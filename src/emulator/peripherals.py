@@ -36,11 +36,24 @@ class TerminalPeripheral:
 
     def _output_character(self, value: int) -> None:
         """Interpret value as ASCII character and print it to stdout."""
-        sys.stdout.write(value.to_bytes().decode())
+        try:
+            ch = value.to_bytes(1, "little").decode()
+        except UnicodeDecodeError:
+            ch = "?"
+
+        sys.stdout.write(ch)
+        if ch == "\r":
+            sys.stdout.write("\n")
+        sys.stdout.flush()
 
     def _input_character(self) -> int:
         self._input_buffer_waiting = False
         return self._input_buffer & 0xff
+
+    def receive_input(self, value: int) -> None:
+        """Receive a byte of input and make it available to the emulated system."""
+        self._input_buffer = value
+        self._input_buffer_waiting = True
 
 
 def monitor_stdin(input_queue: Queue[bytes | None]) -> None:
