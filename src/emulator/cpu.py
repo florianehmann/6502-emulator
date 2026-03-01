@@ -443,6 +443,17 @@ class CPU6502:
         """Execute No OPeration (NOP) instruction."""
         self.cycles += 2
 
+    @opcode(0x40)
+    def rti(self) -> None:
+        """Execute the ReTurn from Interrupt (RTI) instruction."""
+        recovered_status = self.pull_byte_from_stack()
+        rt_lo = self.pull_byte_from_stack()
+        rt_hi = self.pull_byte_from_stack()
+        rt = (rt_hi << 8) | rt_lo
+        self.pc = rt
+        self.status = recovered_status
+        self.cycles += 6
+
     @opcode(0x60)
     def rts(self) -> None:
         """Execute the ReTurn from Subroutine (RTS) instruction."""

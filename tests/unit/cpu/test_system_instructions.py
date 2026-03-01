@@ -62,6 +62,21 @@ def test_jsr(cpu: CPU6502):  # noqa: D103
     assert cpu.cycles == jsr_cycle_count
 
 
+def test_rti(cpu: CPU6502):  # noqa: D103
+    rti_cycle_count = 6
+    return_address = 0x0203
+    status_value = 0b10101010
+    return_address_hi = (return_address >> 8) & 0xff
+    return_address_lo = return_address & 0xff
+    cpu.push_byte_to_stack(return_address_hi)
+    cpu.push_byte_to_stack(return_address_lo)
+    cpu.push_byte_to_stack(status_value)
+    cpu.rti()
+    assert cpu.pc == return_address
+    assert cpu.status == status_value
+    assert cpu.cycles == rti_cycle_count
+
+
 def test_rts(cpu: CPU6502):  # noqa: D103
     rts_cycle_count = 6
     subroutine_address = 0x0208
