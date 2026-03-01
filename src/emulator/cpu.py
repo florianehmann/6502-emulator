@@ -340,6 +340,14 @@ class CPU6502:
         isr_hi = self.memory.read(vector + 1)
         self.pc = (isr_hi << 8) | isr_lo
 
+    def irq(self) -> None:
+        """Issue an Interrupt ReQuest (IRQ) to the CPU."""
+        self._interrupt("maskable")
+
+    def nmi(self) -> None:
+        """Issue a Non-Maskable Interrupt (NMI) to the CPU."""
+        self._interrupt("non-maskable")
+
     # System instructions
 
     @opcode(0x10, flag_index=STATUS_N, flag_value=0)
