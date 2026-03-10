@@ -764,7 +764,7 @@ class CPU6502:
     @opcode(0x16, mode=AddressingMode.ZERO_PAGE_X)
     @opcode(0x0e, mode=AddressingMode.ABSOLUTE)
     @opcode(0x1e, mode=AddressingMode.ABSOLUTE_X)
-    def asl(self, mode: AddressingMode | None) -> None:
+    def asl(self, mode: AddressingMode | None = None) -> None:
         """Execute the Arithmetic Shift Left (ASL) instruction.
 
         If `mode` is None, ASL is performed on the accumulator.
@@ -800,7 +800,7 @@ class CPU6502:
     @opcode(0x56, mode=AddressingMode.ZERO_PAGE_X)
     @opcode(0x4e, mode=AddressingMode.ABSOLUTE)
     @opcode(0x5e, mode=AddressingMode.ABSOLUTE_X)
-    def lsr(self, mode: AddressingMode | None) -> None:
+    def lsr(self, mode: AddressingMode | None = None) -> None:
         """Execute the Logic Shift Right (LSR) instruction.
 
         If `mode` is None, LSR is performed on the accumulator.

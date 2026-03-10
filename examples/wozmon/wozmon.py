@@ -40,7 +40,7 @@ def main() -> None:  # noqa: D103
     cpu = CPU6502(memory_map)
     start_address = (memory_map.read(0xFFFD) << 8) | memory_map.read(0xFFFC)
     cpu.pc = start_address
-    run(cpu, interrupt_hook=interrupt_hook_with_queue, max_steps=None, cycles_per_second=1e5)
+    run(cpu, interrupt_hook=interrupt_hook_with_queue, max_steps=None, cycles_per_second=1e6)
     print("\r")
     print(f"A  NV-BDIZC\r")
     print(f"{cpu.a:02X} {cpu.status:08b}\r")

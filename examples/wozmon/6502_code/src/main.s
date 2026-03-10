@@ -19,26 +19,6 @@ start:
 reset:
         cld
         cli
-        jmp debug_end
-
-        ; debug cr handling
-        lda #$C0
-        sta dsp
-        jsr terminal_output
-debug:
-        bit kbdcr
-        bpl debug
-        lda #$00
-        sta kbdcr
-        lda kbd
-        cmp #cr
-        bne debug
-        lda #$C0
-        sta dsp
-        jsr terminal_output
-        jmp debug
-debug_end:
-
         lda #$A7
         ldy #$80
 
@@ -72,7 +52,6 @@ nextchar:
         sta in,Y                ; Add text to buffer.
         jsr echo
         cmp #cr
-        brk
         bne notcr
         ldy #$FF                ; Reset text index.
         lda #xam

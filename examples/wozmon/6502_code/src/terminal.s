@@ -3,20 +3,22 @@
 .include "variables.inc"
 .export process_input, terminal_output
 
-ascii_bs    = $7F
+ascii_bs    = $08
+ascii_del   = $7F
 
 ; Process an incoming character in the MMIO register of the terminal peripheral
 ; by mapping keycodes from ASCII to Apple I keycodes and copying them addresses
 ; for wozmon to read.
 process_input:
+        pha
         lda TERMIN
-        cmp #ascii_bs
+        cmp #ascii_del
         bne map_non_bs
         lda #bs                 ; replace with Apple I code for backspace.
         jmp code_map_done
 map_non_bs:
         ora #$80
-
+code_map_done:
         ; Store mapped byte in register for wozmon to pick up.
         sta kbd
 
@@ -25,11 +27,13 @@ map_non_bs:
         lda kbdcr
         ora #$80
         sta kbdcr
-code_map_done:
+
+        pla
         rti
 
 ; Process an outgoing character and output it to the terminal peripheral
 terminal_output:
+        pha
         lda dsp
         cmp #bs
         beq output_bs
@@ -43,5 +47,6 @@ output_other:
         and #$7F                ; clear B7.
 write_output:
         sta TERMOUT
+        pla
         rts
 
