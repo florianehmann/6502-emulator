@@ -1,3 +1,22 @@
+[project]
+name = "another6502"
+version = "0.1"
+description = "Python-based behavioral emulator of the NMOS 6502 microprocessor."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Florian Ehmann" }]
+keywords = ["emulator", "6502", "retro"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+]
+
+[project.urls]
+Repository = "https://github.com/florianehmann/another6502"
+Issues = "https://github.com/florianehmann/another6502/issues"
+
 [tool.ruff]
 line-length = 120
 

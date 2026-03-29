@@ -1,7 +1,7 @@
 # another6502
 
 > Did you ever think there just aren't enough Python-based 6502 emulators out there?
-> Well, too bad, 'cause here is yet `another6502`!
+> Well, too bad, cause here is yet `another6502`!
 
 A lightweight, behavioral MOS 6502 emulator written in Python, designed for clarity, testability, and experimentation.
 It can serve as a platform for further retro-computing experiments.
@@ -85,4 +85,4 @@ Feedback, issues, and pull requests are welcome!
 
 ## License
 
-(TODO license)
+MIT, go nuts - see LICENSE file for details.
