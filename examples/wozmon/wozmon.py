@@ -22,9 +22,12 @@ def interrupt_hook(cpu: CPU6502, input_queue: Queue[bytes | None], terminal: Ter
 
 
 def main() -> None:  # noqa: D103
+    # monitor incoming keystrokes and store them in a queue
     input_queue: Queue[bytes | None] = Queue()
     Thread(target=monitor_stdin, args=(input_queue,)).start()
     terminal = TerminalPeripheral()
+
+    # issue interrupts to the CPU when new inputs are in the queue
     interrupt_hook_with_queue = partial(interrupt_hook, input_queue=input_queue, terminal=terminal)
 
     ram = MemoryBlock(0xD000)
@@ -39,9 +42,6 @@ def main() -> None:  # noqa: D103
         .add_block(0xE000, rom))
     cpu = CPU6502(memory_map)
     run(cpu, interrupt_hook=interrupt_hook_with_queue, max_steps=None, cycles_per_second=1e6)
-    print("\r")
-    print(f"A  NV-BDIZC\r")
-    print(f"{cpu.a:02X} {cpu.status:08b}\r")
 
 
 if __name__ == "__main__":
