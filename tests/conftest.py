@@ -2,8 +2,8 @@
 
 import pytest
 
-from emulator.cpu import CPU6502
-from emulator.memory import Memory, MemoryBlock
+from another6502.cpu import CPU6502
+from another6502.memory import Memory, MemoryBlock
 
 
 @pytest.fixture

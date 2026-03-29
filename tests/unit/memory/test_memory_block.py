@@ -2,7 +2,7 @@
 
 import pytest
 
-from emulator.memory import MemoryBlock
+from another6502.memory import MemoryBlock
 
 
 def test_write_bytes(memory: MemoryBlock):  # noqa: D103

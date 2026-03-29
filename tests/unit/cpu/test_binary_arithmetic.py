@@ -2,8 +2,8 @@
 
 import pytest
 
-from emulator.cpu import CPU6502, AddressingMode
-from emulator.utils import dec_to_bcd
+from another6502.cpu import CPU6502, AddressingMode
+from another6502.utils import dec_to_bcd
 
 
 @pytest.mark.parametrize(

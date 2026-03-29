@@ -1,9 +1,8 @@
 """Test instructions that set and store status register flags."""
 
-
 import pytest
 
-from emulator.cpu import CPU6502
+from another6502.cpu import CPU6502
 
 
 @pytest.mark.parametrize(

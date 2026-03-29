@@ -6,7 +6,7 @@ import tty
 from queue import Queue
 from typing import ClassVar
 
-from emulator.memory import MemoryMap, MMIORegister
+from another6502.memory import MemoryMap, MMIORegister
 
 
 class TerminalPeripheral:

@@ -1,6 +1,6 @@
 """Tests for Memory Maps."""
 
-from emulator.memory import MemoryBlock, MemoryMap
+from another6502.memory import MemoryBlock, MemoryMap
 
 TEST_VALUE = 0xfe
 

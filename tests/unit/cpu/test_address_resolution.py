@@ -1,6 +1,6 @@
 """Test memory address resolution for the different addressing modes."""
 
-from emulator.cpu import CPU6502, AddressingMode
+from another6502.cpu import CPU6502, AddressingMode
 from tests.unit.cpu import (
     ABSOLUTE_LOCATION,
     INDEX,

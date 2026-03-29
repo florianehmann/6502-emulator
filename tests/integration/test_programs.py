@@ -1,6 +1,6 @@
 """Test simple 6502 machine code to exercise instructions in combination."""
 
-from emulator.cpu import CPU6502, run
+from another6502.cpu import CPU6502, run
 
 
 def test_minimal_program(cpu: CPU6502):

@@ -1,8 +1,8 @@
 """Generate a Hello World output message on the terminal."""  # noqa: INP001
 
-from emulator.cpu import CPU6502, run
-from emulator.memory import MemoryBlock, MemoryMap
-from emulator.peripherals import TerminalPeripheral
+from another6502.cpu import CPU6502, run
+from another6502.memory import MemoryBlock, MemoryMap
+from another6502.peripherals import TerminalPeripheral
 
 # .ORG $1000
 #

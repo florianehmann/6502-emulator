@@ -1,7 +1,7 @@
 """Test instructions for pushing and pulling from the stack."""
 
 
-from emulator.cpu import CPU6502
+from another6502.cpu import CPU6502
 from tests.unit.cpu import (
     TEST_VALUE,
 )

@@ -2,7 +2,7 @@
 
 import pytest
 
-from emulator.cpu import CPU6502
+from another6502.cpu import CPU6502
 
 TEST_FLAG_OFFSET = 5
 N_CYCLES_BRANCH_TAKEN = 3

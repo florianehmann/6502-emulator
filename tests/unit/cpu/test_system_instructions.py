@@ -1,7 +1,7 @@
 """Test control instructions, i.e., BRK, and NOP."""
 
-from emulator.cpu import CPU6502
-from emulator.memory import MemoryBlock
+from another6502.cpu import CPU6502
+from another6502.memory import MemoryBlock
 
 
 def test_brk():  # noqa: D103

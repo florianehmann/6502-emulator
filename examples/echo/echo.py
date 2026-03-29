@@ -6,9 +6,9 @@ from pathlib import Path
 from queue import Queue
 from threading import Thread
 
-from emulator.cpu import CPU6502, run
-from emulator.memory import MemoryBlock, MemoryMap
-from emulator.peripherals import TerminalPeripheral, monitor_stdin
+from another6502.cpu import CPU6502, run
+from another6502.memory import MemoryBlock, MemoryMap
+from another6502.peripherals import TerminalPeripheral, monitor_stdin
 
 
 def interrupt_hook(cpu: CPU6502, input_queue: Queue[bytes | None], terminal: TerminalPeripheral) -> None:

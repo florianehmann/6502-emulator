@@ -1,6 +1,6 @@
 """Test register storing instructions, i.e., STA, STX, and STY."""
 
-from emulator.cpu import CPU6502, AddressingMode
+from another6502.cpu import CPU6502, AddressingMode
 from tests.unit.cpu import ABSOLUTE_LOCATION, PAGE_CROSS_INDEX, TEST_VALUE
 
 

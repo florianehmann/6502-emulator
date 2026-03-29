@@ -3,7 +3,7 @@
 
 import pytest
 
-from emulator.cpu import CPU6502, AddressingMode
+from another6502.cpu import CPU6502, AddressingMode
 from tests.unit.cpu import (
     TEST_VALUE,
     ZERO_PAGE_LOCATION,

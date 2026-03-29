@@ -2,7 +2,7 @@
 
 import pytest
 
-from emulator.cpu import CPU6502, AddressingMode
+from another6502.cpu import CPU6502, AddressingMode
 
 
 @pytest.mark.parametrize(

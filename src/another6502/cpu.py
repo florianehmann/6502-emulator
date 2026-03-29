@@ -7,8 +7,8 @@ from collections.abc import Callable
 from functools import partial
 from typing import Any, ClassVar, Literal
 
-from emulator.memory import Memory
-from emulator.utils import assert_never, dec_to_bcd
+from another6502.memory import Memory
+from another6502.utils import assert_never, dec_to_bcd
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,6 @@
 """Test instructions for loading data from memories into registers, i.e., LDA, LDX, and LDY."""
 
-
-from emulator.cpu import CPU6502, AddressingMode
+from another6502.cpu import CPU6502, AddressingMode
 from tests.unit.cpu import (
     ABSOLUTE_LOCATION,
     PAGE_CROSS_INDEX,

@@ -2,7 +2,7 @@
 
 import pytest
 
-from emulator.memory import Memory, MemoryMap, MMIORegister
+from another6502.memory import Memory, MemoryMap, MMIORegister
 
 TEST_VALUE = 0xfe
 
