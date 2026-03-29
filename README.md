@@ -4,8 +4,11 @@
 > Well, too bad, 'cause here is yet `another6502`!
 
 A lightweight, behavioral MOS 6502 emulator written in Python, designed for clarity, testability, and experimentation.
+It can serve as a platform for further retro-computing experiments.
 
-It can run WozMon by exposing your terminal to the CPU as a memory-mapped peripheral and can serve as a platform for further retro-computing experiments.
+![Animation of the WozMon example running](assets/wozmon.svg)
+
+This example shows it running WozMon by exposing the terminal to the CPU as a memory-mapped peripheral.
 
 ## Features
 
@@ -29,8 +32,6 @@ Currently **still missing** / potentially added later:
 
 ## Installation
 
-(TODO pip installation)
-
 Install from source:
 
 ```bash
@@ -40,8 +41,6 @@ pip install -e .
 ```
 
 ## Examples
-
-(TODO minimal example code)
 
 For more detailed examples, see the `examples/` directory. There you can find:
 
@@ -82,7 +81,7 @@ This project is primarily aimed at:
 
 ## Contributing
 
-(TODO contributing)
+Feedback, issues, and pull requests are welcome!
 
 ## License
 
