@@ -79,6 +79,21 @@ This project is primarily aimed at:
 - Creating a controlled and observable environment for 6502 software development
 - Providing a platform for future experiments
 
+## Publishing to PyPI
+
+To publish the package to PyPI, follow these steps:
+
+```bash
+# Build the package
+uv build
+
+# Upload to TestPyPI for testing
+uv run twine upload --repository testpypi dist/*
+
+# Upload to PyPI for production
+uv run twine upload dist/*
+```
+
 ## Contributing
 
 Feedback, issues, and pull requests are welcome!
